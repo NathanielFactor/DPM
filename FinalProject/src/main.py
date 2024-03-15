@@ -23,6 +23,7 @@ SIDE_US = EV3UltrasonicSensor(5) # port S3
 MOTOR_LEFT = BP.PORT_A
 MOTOR_RIGHT = BP.PORT_B
 MOTOR_NAVIGATION = BP.PORT_C
+MOTOR_LAUNCH = BP.PORT_D
 
 # Setup before the robot begins
 print("Done initializing code")
@@ -160,3 +161,21 @@ if __name__ == "__main__":
     print("Robot initializing...")
     begin_threading_instances()
     monitor_kill_switch()
+
+def launch(): #MOTOR_LAUNCH
+    for i in range(10): #change 10 to however many balls are loaded
+        BP.set_motor_limits(MOTOR_LAUNCH, 100, 100)
+        BP.set_motor_position_relative(MOTOR_LAUNCH, 20)
+        BP.set_motor_position_relative(MOTOR_LAUNCH, -20)
+        sleep(5)
+
+def colourDetection(): #COLOR_SENSOR
+    while True:
+        red_lvl = COLOR_SENSOR.get_rgb()[0]
+
+        if red_lvl > 30:
+            return True
+        else:
+            return False
+
+
