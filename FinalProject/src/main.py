@@ -38,6 +38,7 @@ POWER_LIMIT = 70
 FRONT_COLLISSION = False
 DISTANCE_TO_LOADING = 0
 TUNNEL_COUNTER = 0
+RED_DETECTION = False
 
 
 def play_sound(NOTE):
@@ -49,16 +50,18 @@ def play_sound(NOTE):
 
 def drive():
     speed = 50  # Adjust speed as needed
-    BP.set_motor_limits(MOTOR_LEFT, 50)  # Adjust as needed
-    BP.set_motor_limits(MOTOR_RIGHT, 50)  # Adjust as needed
+    BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+    BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
     while True:
         BP.set_motor_power(MOTOR_LEFT, speed)
         BP.set_motor_power(MOTOR_RIGHT, speed)
-   
+        if FRONT_COLLISSION:
+            stopDriving()
+            break
+
     
 def otherTunnel():
     #rotate the robot a certain amount of cm to the left and select the other tunnel then resume drive
-    TUNNEL_COUNTER = 0
     return
 
 
@@ -73,16 +76,54 @@ def frontUSensor():
         
         #update total distance travelled
         distance_difference = distance - DISTANCE_TO_LOADING
-        DISTANCE_TO_LOADING += distance_difference
+        updated_total_dist = DISTANCE_TO_LOADING + distance_difference
+        DISTANCE_TO_LOADING = updated_total_dist #need to init global variable like this to update value
         
         #tunnel detected
-        if (distance < 20) and (TUNNEL_COUNTER == 0):
+        if (distance < 20) and ((TUNNEL_COUNTER == 0) or (TUNNEL_COUNTER == 3)):
             FRONT_COLLISSION = True
             TUNNEL_COUNTER = 1
             otherTunnel()
             
+        # First encounter with wall turn left
         elif (distance < 20) and (TUNNEL_COUNTER == 1):
             #rotate the robot 90 degrees with the wheels
+            speed = 50
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
+
+            #rotate 90 degrees
+            BP.set_motor_power(MOTOR_LEFT, speed)
+            BP.set_motor_power(MOTOR_RIGHT, -speed)
+            
+            # Time taken to rotate 90 degrees (adjust this based on experimentation)
+            rotation_time = 1.8  # seconds
+            # Wait for the rotation to complete
+            sleep(rotation_time)
+            # Stop motors
+            stopDriving()
+            TUNNEL_COUNTER = 2
+        
+        # Second encounter with wall, turn right
+        elif (distance < 20) and (TUNNEL_COUNTER == 2):
+            #rotate the robot 90 degrees with the wheels
+            speed = 50
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
+
+            #rotate 90 degrees
+            BP.set_motor_power(MOTOR_LEFT, -speed)
+            BP.set_motor_power(MOTOR_RIGHT, speed)
+            
+            # Time taken to rotate 90 degrees (adjust this based on experimentation)
+            rotation_time = 1.8  # seconds
+            # Wait for the rotation to complete
+            sleep(rotation_time)
+            # Stop motors
+            stopDriving()
+            TUNNEL_COUNTER = 3
+        
+
             
             
 def loadingPhase():
@@ -110,19 +151,43 @@ def loadingPhase():
                 BP.set_motor_limits(MOTOR_NAVIGATION,POWER_LIMIT,500)
                 BP.set_motor_position_relative(MOTOR_NAVIGATION, 180)
                 LOADING_PHASE = False
-    
+
+
+def stopDriving():
+    BP.set_motor_limits(MOTOR_LEFT, 0)
+    BP.set_motor_limits(MOTOR_RIGHT, 0)
+
+
+#Launch Mechanism
+def launch():
+    while True:
+        if RED_DETECTION:
+            #kill driving
+            for i in range(10): #change 10 to however many balls are loaded
+                BP.set_motor_limits(MOTOR_LAUNCH, 100, 100)
+                BP.set_motor_position_relative(MOTOR_LAUNCH, 20)
+                BP.set_motor_position_relative(MOTOR_LAUNCH, -20)
+                print("launched ball")
+                sleep(5)
+                i += 1
+
+def colourDetection():
+    while True:
+        #COLOR_SENSOR
+        red_lvl = COLOR_SENSOR.get_rgb()[0]
+        if red_lvl > 30:
+            print("red detected")
+            RED_DETECTION = True
+            
 
 def monitor_kill_switch():
-
     """
     Verify the status of the kill switch touch sensor. If the kill switch is activated, terminate the whole program.
     This function will be continuously ran, and is only terminated if the kill switch is pressed.
     """
-
     try:
         while True:
             sleep(0.01)
-            print("in main")
             if EMERGENCY_STOP.is_pressed():
                 print("KILL SWItCH HIt")    
                 exit()
@@ -169,21 +234,3 @@ if __name__ == "__main__":
     print("Robot initializing...")
     begin_threading_instances()
     monitor_kill_switch()
-
-def launch(): #MOTOR_LAUNCH
-    for i in range(10): #change 10 to however many balls are loaded
-        BP.set_motor_limits(MOTOR_LAUNCH, 100, 100)
-        BP.set_motor_position_relative(MOTOR_LAUNCH, 20)
-        BP.set_motor_position_relative(MOTOR_LAUNCH, -20)
-        sleep(5)
-
-def colourDetection(): #COLOR_SENSOR
-    while True:
-        red_lvl = COLOR_SENSOR.get_rgb()[0]
-
-        if red_lvl > 30:
-            return True
-        else:
-            return False
-
-
