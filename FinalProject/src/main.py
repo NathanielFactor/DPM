@@ -39,6 +39,9 @@ FRONT_COLLISSION = False
 DISTANCE_TO_LOADING = 0
 TUNNEL_COUNTER = 0
 RED_DETECTION = False
+RW = 0.025
+RB = 0.1905
+DISTTODEG = 180/(3.1416*RW)
 
 
 def play_sound(NOTE):
@@ -46,6 +49,12 @@ def play_sound(NOTE):
     """Play a single note."""
     NOTE.play()
     NOTE.wait_done()
+
+def moveDistForward():
+    return
+    
+def initPath():
+    return
 
 
 def drive():
@@ -87,6 +96,7 @@ def frontUSensor():
             
         # First encounter with wall turn left
         elif (distance < 20) and (TUNNEL_COUNTER == 1):
+            FRONT_COLLISSION = True #stop driving thread
             #rotate the robot 90 degrees with the wheels
             speed = 50
             BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
@@ -97,7 +107,7 @@ def frontUSensor():
             BP.set_motor_power(MOTOR_RIGHT, -speed)
             
             # Time taken to rotate 90 degrees (adjust this based on experimentation)
-            rotation_time = 1.8  # seconds
+            rotation_time = 1.0  # seconds
             # Wait for the rotation to complete
             sleep(rotation_time)
             # Stop motors
@@ -106,6 +116,7 @@ def frontUSensor():
         
         # Second encounter with wall, turn right
         elif (distance < 20) and (TUNNEL_COUNTER == 2):
+            FRONT_COLLISSION = True #stop driving thread
             #rotate the robot 90 degrees with the wheels
             speed = 50
             BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
@@ -116,14 +127,12 @@ def frontUSensor():
             BP.set_motor_power(MOTOR_RIGHT, speed)
             
             # Time taken to rotate 90 degrees (adjust this based on experimentation)
-            rotation_time = 1.8  # seconds
+            rotation_time = 1.0  # seconds
             # Wait for the rotation to complete
             sleep(rotation_time)
             # Stop motors
             stopDriving()
             TUNNEL_COUNTER = 3
-        
-
             
             
 def loadingPhase():
@@ -170,6 +179,7 @@ def launch():
                 print("launched ball")
                 sleep(5)
                 i += 1
+
 
 def colourDetection():
     while True:
