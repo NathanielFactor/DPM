@@ -36,7 +36,7 @@ POWER_LIMIT = 70
 # Pathing global variables
 FRONT_COLLISSION = False
 DISTANCE_TO_LOADING = 0
-tunnel_counter = 0
+TUNNEL_COUNTER = 0
 
 
 def play_sound(NOTE):
@@ -47,20 +47,25 @@ def play_sound(NOTE):
 
 
 def drive():
+    speed = 50  # Adjust speed as needed
+    BP.set_motor_limits(MOTOR_LEFT, 50)  # Adjust as needed
+    BP.set_motor_limits(MOTOR_RIGHT, 50)  # Adjust as needed
     while True:
-        speed = 200
-        rotation = 360
-        BP.set_motor_limits(MOTOR_LEFT, POWER_LIMIT, speed)
-        BP.set_motor_limits(MOTOR_RIGHT, POWER_LIMIT, speed)
-    return
+        BP.set_motor_power(MOTOR_LEFT, speed)
+        BP.set_motor_power(MOTOR_RIGHT, speed)
    
     
 def otherTunnel():
     #rotate the robot a certain amount of cm to the left and select the other tunnel then resume drive
+    TUNNEL_COUNTER = 0
     return
 
 
-def frontSensor():
+def sideUSensor():
+    return
+
+
+def frontUSensor():
     
     while not FRONT_COLLISSION:
         distance = FRONT_US.get_cm()
@@ -70,12 +75,15 @@ def frontSensor():
         DISTANCE_TO_LOADING += distance_difference
         
         #tunnel detected
-        if distance < 20:
+        if (distance < 20) and (TUNNEL_COUNTER == 0):
             FRONT_COLLISSION = True
-            tunnel_counter += 1
+            TUNNEL_COUNTER = 1
             otherTunnel()
             
-
+        elif (distance < 20) and (TUNNEL_COUNTER == 1):
+            #rotate the robot 90 degrees with the wheels
+            
+            
 def loadingPhase():
     """
     This is to be run in its own thread. Enter the loading phase if the global variable of 420 cm is met.
