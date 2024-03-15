@@ -36,8 +36,12 @@ POWER_LIMIT = 70
 
 # Pathing global variables
 FRONT_COLLISSION = False
-DISTANCE_TO_LOADING = 0
-tunnel_counter = 0
+distanceToLoading = 0
+tunnelCounter = 0
+RED_DETECTION = False
+RW = 0.025
+RB = 0.1905
+DISTTODEG = 180/(3.1416*RW)
 
 
 def play_sound(NOTE):
@@ -46,37 +50,134 @@ def play_sound(NOTE):
     NOTE.play()
     NOTE.wait_done()
 
+def moveDistForward():
+    return
+    
+def initPath():
+    return
+
 
 def drive():
+    speed = 50  # Adjust speed as needed
+    BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+    BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
     while True:
-        speed = 200
-        rotation = 360
-        BP.set_motor_limits(MOTOR_LEFT, POWER_LIMIT, speed)
-        BP.set_motor_limits(MOTOR_RIGHT, POWER_LIMIT, speed)
-    return
-   
+        BP.set_motor_power(MOTOR_LEFT, speed)
+        BP.set_motor_power(MOTOR_RIGHT, speed)
+        if FRONT_COLLISSION:
+            stopDriving()
+            break
+
     
 def otherTunnel():
     #rotate the robot a certain amount of cm to the left and select the other tunnel then resume drive
     return
 
 
-def frontSensor():
+def sideUSensor(): #MOTOR_LEFT, MOTOR_RIGHT, SIDE_US
+    sample_int = 0.2 #sample every 200 ms
+    wall_dist = 0.2 #20 cm from wall
+    deadband = 0.05 #5 cm tolerance from wall_dist
+    speed = 150 #default speed
+    delta_speed = 100 #default change in speed
+    us_outlier = 200 #anything outside of 200 cm is ignored
+
+    try:
+        wait_ready_sensors()
+        MOTOR_LEFT.set_limits(80, 150) #power, speed
+        MOTOR_RIGHT.set_limits(80, 150)
+        MOTOR_LEFT.reset_encoder()
+        MOTOR_RIGHT.reset_encoder()
+
+        while True:
+            dist = SIDE_US.get_cm()
+
+            if dist >= us_outlier:
+                dist = wall_dist
+
+            dist = dist/100.0
+            error = wall_dist - dist
+            print('dist: {:0.2f}'.format(dist))
+            print('error: {:0.2f}'.format(error))
+
+            #case1: error is within deadband tolerance: no change
+            if abs(error) <= deadband:
+                MOTOR_LEFT.set_dps(speed)
+                MOTOR_RIGHT.set_dps(speed)
+
+            #case2: negative error, move closer to wall
+            elif error < 0:
+                MOTOR_LEFT.set_dps(speed)
+                MOTOR_RIGHT.set_dps(speed + delta_speed)
+
+            #case3: positive error, move further from wall
+            else:
+                MOTOR_LEFT.set_dps(speed + delta_speed)
+                MOTOR_RIGHT.set_dps(speed)
+
+            sleep(sample_int)
+
+    except (KeyboardInterrupt, OSError): #program will exit when Ctrl + C
+        BP.reset_all()
+
+
+def frontUSensor():
     
     while not FRONT_COLLISSION:
         distance = FRONT_US.get_cm()
         
         #update total distance travelled
         distance_difference = distance - DISTANCE_TO_LOADING
-        DISTANCE_TO_LOADING += distance_difference
+        updated_total_dist = DISTANCE_TO_LOADING + distance_difference
+        DISTANCE_TO_LOADING = updated_total_dist #need to init global variable like this to update value
         
         #tunnel detected
-        if distance < 20:
+        if (distance < 20) and ((TUNNEL_COUNTER == 0) or (TUNNEL_COUNTER == 3)):
             FRONT_COLLISSION = True
-            tunnel_counter += 1
+            TUNNEL_COUNTER = 1
             otherTunnel()
             
+        # First encounter with wall turn left
+        elif (distance < 20) and (TUNNEL_COUNTER == 1):
+            FRONT_COLLISSION = True #stop driving thread
+            #rotate the robot 90 degrees with the wheels
+            speed = 50
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
 
+            #rotate 90 degrees
+            BP.set_motor_power(MOTOR_LEFT, speed)
+            BP.set_motor_power(MOTOR_RIGHT, -speed)
+            
+            # Time taken to rotate 90 degrees (adjust this based on experimentation)
+            rotation_time = 1.0  # seconds
+            # Wait for the rotation to complete
+            sleep(rotation_time)
+            # Stop motors
+            stopDriving()
+            TUNNEL_COUNTER = 2
+        
+        # Second encounter with wall, turn right
+        elif (distance < 20) and (TUNNEL_COUNTER == 2):
+            FRONT_COLLISSION = True #stop driving thread
+            #rotate the robot 90 degrees with the wheels
+            speed = 50
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
+
+            #rotate 90 degrees
+            BP.set_motor_power(MOTOR_LEFT, -speed)
+            BP.set_motor_power(MOTOR_RIGHT, speed)
+            
+            # Time taken to rotate 90 degrees (adjust this based on experimentation)
+            rotation_time = 1.0  # seconds
+            # Wait for the rotation to complete
+            sleep(rotation_time)
+            # Stop motors
+            stopDriving()
+            TUNNEL_COUNTER = 3
+            
+            
 def loadingPhase():
     """
     This is to be run in its own thread. Enter the loading phase if the global variable of 420 cm is met.
@@ -102,19 +203,44 @@ def loadingPhase():
                 BP.set_motor_limits(MOTOR_NAVIGATION,POWER_LIMIT,500)
                 BP.set_motor_position_relative(MOTOR_NAVIGATION, 180)
                 LOADING_PHASE = False
-    
+
+
+def stopDriving():
+    BP.set_motor_limits(MOTOR_LEFT, 0)
+    BP.set_motor_limits(MOTOR_RIGHT, 0)
+
+
+#Launch Mechanism
+def launch():
+    while True:
+        if RED_DETECTION:
+            #kill driving
+            for i in range(10): #change 10 to however many balls are loaded
+                BP.set_motor_limits(MOTOR_LAUNCH, 100, 100)
+                BP.set_motor_position_relative(MOTOR_LAUNCH, 20)
+                BP.set_motor_position_relative(MOTOR_LAUNCH, -20)
+                print("launched ball")
+                sleep(5)
+                i += 1
+
+
+def colourDetection():
+    while True:
+        #COLOR_SENSOR
+        red_lvl = COLOR_SENSOR.get_rgb()[0]
+        if red_lvl > 30:
+            print("red detected")
+            RED_DETECTION = True
+            
 
 def monitor_kill_switch():
-
     """
     Verify the status of the kill switch touch sensor. If the kill switch is activated, terminate the whole program.
     This function will be continuously ran, and is only terminated if the kill switch is pressed.
     """
-
     try:
         while True:
             sleep(0.01)
-            print("in main")
             if EMERGENCY_STOP.is_pressed():
                 print("KILL SWItCH HIt")    
                 exit()
@@ -161,69 +287,3 @@ if __name__ == "__main__":
     print("Robot initializing...")
     begin_threading_instances()
     monitor_kill_switch()
-
-def launch(): #MOTOR_LAUNCH
-    for i in range(10): #change 10 to however many balls are loaded
-        BP.set_motor_limits(MOTOR_LAUNCH, 100, 100)
-        BP.set_motor_position_relative(MOTOR_LAUNCH, 20)
-        BP.set_motor_position_relative(MOTOR_LAUNCH, -20)
-        sleep(5)
-
-def colourDetection(): #COLOR_SENSOR
-    while True:
-        red_lvl = COLOR_SENSOR.get_rgb()[0]
-
-        if red_lvl > 30:
-            return True
-        else:
-            return False
-
-def wallFollow(): #MOTOR_LEFT, MOTOR_RIGHT, SIDE_US
-    sample_int = 0.2 #sample every 200 ms
-    wall_dist = 0.2 #20 cm from wall
-    deadband = 0.05 #5 cm tolerance from wall_dist
-    speed = 150 #default speed
-    delta_speed = 100 #default change in speed
-    us_outlier = 200 #anything outside of 200 cm is ignored
-
-    try:
-        wait_ready_sensors()
-        MOTOR_LEFT.set_limits(80, 150) #power, speed
-        MOTOR_RIGHT.set_limits(80, 150)
-        MOTOR_LEFT.reset_encoder()
-        MOTOR_RIGHT.reset_encoder()
-
-        while True:
-            dist = SIDE_US.get_cm()
-
-            if dist >= us_outlier:
-                dist = wall_dist
-
-            dist = dist/100.0
-            error = wall_dist - dist
-            print('dist: {:0.2f}'.format(dist))
-            print('error: {:0.2f}'.format(error))
-
-            #case1: error is within deadband tolerance: no change
-            if abs(error) <= deadband:
-                MOTOR_LEFT.set_dps(speed)
-                MOTOR_RIGHT.set_dps(speed)
-            
-            #case2: negative error, move closer to wall
-            elif error < 0:
-                MOTOR_LEFT.set_dps(speed)
-                MOTOR_RIGHT.set_dps(speed + delta_speed)
-
-            #case3: positive error, move further from wall
-            else:
-                MOTOR_LEFT.set_dps(speed + delta_speed)
-                MOTOR_RIGHT.set_dps(speed)
-
-            sleep(sample_int)
-    
-    except (KeyboardInterrupt, OSError): #program will exit when Ctrl + C
-        BP.reset_all()
-            
-
-
-
