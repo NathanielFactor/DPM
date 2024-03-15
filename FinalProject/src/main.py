@@ -42,6 +42,7 @@ RED_DETECTION = False
 RW = 0.025
 RB = 0.1905
 DISTTODEG = 180/(3.1416*RW)
+ORIENTTODEG = RB/RW
 
 
 def play_sound(NOTE):
@@ -50,31 +51,54 @@ def play_sound(NOTE):
     NOTE.play()
     NOTE.wait_done()
 
-def moveDistForward():
-    return
-    
+def moveDistForward(dist):
+    try:
+        speed = 150
+        BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
+        BP.set_motor_position_relative(MOTOR_LEFT, int(dist*DISTTODEG))
+        BP.set_motor_position_relative(MOTOR_RIGHT, int(dist*DISTTODEG))
+        print("Finished moving: " + dist)
+    except IOError as error:
+        print(error)
+
+
+def rotateDegreesRight(angle):
+    try:
+        speed = 150
+        BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
+        BP.set_motor_position_relative(MOTOR_LEFT, int(angle*ORIENTTODEG))
+        BP.set_motor_position_relative(MOTOR_RIGHT, int(-angle*ORIENTTODEG))
+    except IOError as error:
+        print(error)
+        
+def rotateDegreesLeft(angle):
+    try:
+        speed = 150
+        BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
+        BP.set_motor_position_relative(MOTOR_LEFT, int(-angle*ORIENTTODEG))
+        BP.set_motor_position_relative(MOTOR_RIGHT, int(angle*ORIENTTODEG))
+    except IOError as error:
+        print(error)
+
+
 def initPath():
-    return
-
-
-def drive():
-    speed = 50  # Adjust speed as needed
-    BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
-    BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
-    while True:
-        BP.set_motor_power(MOTOR_LEFT, speed)
-        BP.set_motor_power(MOTOR_RIGHT, speed)
-        if FRONT_COLLISSION:
-            stopDriving()
-            break
+    #align the robot with the red tunnel close to the wall
+    rotateDegreesRight(90)
+    moveDistForward(15)
+    rotateDegreesLeft(90)
 
     
 def otherTunnel():
     #rotate the robot a certain amount of cm to the left and select the other tunnel then resume drive
-    return
+    rotateDegreesLeft(90)
+    moveDistForward(20)
+    rotateDegreesRight(90)
 
 
-def sideUSensor(): #MOTOR_LEFT, MOTOR_RIGHT, SIDE_US
+def sideUSensor():
     sample_int = 0.2 #sample every 200 ms
     wall_dist = 0.2 #20 cm from wall
     deadband = 0.05 #5 cm tolerance from wall_dist
@@ -127,9 +151,8 @@ def frontUSensor():
         distance = FRONT_US.get_cm()
         
         #update total distance travelled
-        distance_difference = distance - DISTANCE_TO_LOADING
-        updated_total_dist = DISTANCE_TO_LOADING + distance_difference
-        DISTANCE_TO_LOADING = updated_total_dist #need to init global variable like this to update value
+        distance_difference = distance - distanceToLoading
+        distanceToLoading += distance_difference#need to init global variable like this to update value
         
         #tunnel detected
         if (distance < 20) and ((TUNNEL_COUNTER == 0) or (TUNNEL_COUNTER == 3)):
@@ -141,13 +164,7 @@ def frontUSensor():
         elif (distance < 20) and (TUNNEL_COUNTER == 1):
             FRONT_COLLISSION = True #stop driving thread
             #rotate the robot 90 degrees with the wheels
-            speed = 50
-            BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
-            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
-
-            #rotate 90 degrees
-            BP.set_motor_power(MOTOR_LEFT, speed)
-            BP.set_motor_power(MOTOR_RIGHT, -speed)
+            rotateDegreesLeft(90)
             
             # Time taken to rotate 90 degrees (adjust this based on experimentation)
             rotation_time = 1.0  # seconds
@@ -178,6 +195,7 @@ def frontUSensor():
             TUNNEL_COUNTER = 3
             
             
+#Enter Loading Phase Initiation           
 def loadingPhase():
     """
     This is to be run in its own thread. Enter the loading phase if the global variable of 420 cm is met.
@@ -189,7 +207,7 @@ def loadingPhase():
     
     while True:
         #note this detection for distance will be in the drive() function not in here!
-        if DISTANCE_TO_LOADING == 420:
+        if distanceToLoading == 420:
             LOADING_PHASE = True 
             
         while LOADING_PHASE: # If button pressed, motor will continuously drum
@@ -205,6 +223,7 @@ def loadingPhase():
                 LOADING_PHASE = False
 
 
+#Stops Driving Motors
 def stopDriving():
     BP.set_motor_limits(MOTOR_LEFT, 0)
     BP.set_motor_limits(MOTOR_RIGHT, 0)
@@ -224,6 +243,7 @@ def launch():
                 i += 1
 
 
+#Detects Red Colour
 def colourDetection():
     while True:
         #COLOR_SENSOR
@@ -233,6 +253,7 @@ def colourDetection():
             RED_DETECTION = True
             
 
+#Kill Switch Implementation
 def monitor_kill_switch():
     """
     Verify the status of the kill switch touch sensor. If the kill switch is activated, terminate the whole program.
@@ -285,5 +306,5 @@ if __name__ == "__main__":
 
     sleep(2)
     print("Robot initializing...")
-    begin_threading_instances()
+    initPath()
     monitor_kill_switch()
