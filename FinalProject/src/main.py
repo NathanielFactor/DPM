@@ -36,8 +36,8 @@ POWER_LIMIT = 70
 
 # Pathing global variables
 FRONT_COLLISSION = False
-DISTANCE_TO_LOADING = 0
-TUNNEL_COUNTER = 0
+distanceToLoading = 0
+tunnelCounter = 0
 RED_DETECTION = False
 RW = 0.025
 RB = 0.1905
