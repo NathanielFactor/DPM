@@ -178,4 +178,52 @@ def colourDetection(): #COLOR_SENSOR
         else:
             return False
 
+def wallFollow(): #MOTOR_LEFT, MOTOR_RIGHT, SIDE_US
+    sample_int = 0.2 #sample every 200 ms
+    wall_dist = 0.2 #20 cm from wall
+    deadband = 0.05 #5 cm tolerance from wall_dist
+    speed = 150 #default speed
+    delta_speed = 100 #default change in speed
+    us_outlier = 200 #anything outside of 200 cm is ignored
+
+    try:
+        wait_ready_sensors()
+        MOTOR_LEFT.set_limits(80, 150) #power, speed
+        MOTOR_RIGHT.set_limits(80, 150)
+        MOTOR_LEFT.reset_encoder()
+        MOTOR_RIGHT.reset_encoder()
+
+        while True:
+            dist = SIDE_US.get_cm()
+
+            if dist >= us_outlier:
+                dist = wall_dist
+
+            dist = dist/100.0
+            error = wall_dist - dist
+            print('dist: {:0.2f}'.format(dist))
+            print('error: {:0.2f}'.format(error))
+
+            #case1: error is within deadband tolerance: no change
+            if abs(error) <= deadband:
+                MOTOR_LEFT.set_dps(speed)
+                MOTOR_RIGHT.set_dps(speed)
+            
+            #case2: negative error, move closer to wall
+            elif error < 0:
+                MOTOR_LEFT.set_dps(speed)
+                MOTOR_RIGHT.set_dps(speed + delta_speed)
+
+            #case3: positive error, move further from wall
+            else:
+                MOTOR_LEFT.set_dps(speed + delta_speed)
+                MOTOR_RIGHT.set_dps(speed)
+
+            sleep(sample_int)
+    
+    except (KeyboardInterrupt, OSError): #program will exit when Ctrl + C
+        BP.reset_all()
+            
+
+
 
