@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # Imports 
-from utils.brick import wait_ready_sensors, TouchSensor, reset_brick, Motor 
+from utils.brick import wait_ready_sensors, TouchSensor, reset_brick, Motor, EV3ColorSensor, EV3UltrasonicSensor
 from time import sleep
 from utils import sound
 import brickpi3
@@ -14,6 +14,11 @@ BP = brickpi3.BrickPi3() # Initialize the brickPi
 LOADING_PHASE_BTN = TouchSensor(2)
 EMERGENCY_STOP = TouchSensor(1)
 
+# Colour and US Sensor port connections
+COLOR_SENSOR = EV3ColorSensor(3) # port S2
+FRONT_US = EV3UltrasonicSensor(4) # port S3
+SIDE_US = EV3UltrasonicSensor(5) # port S3
+
 # Motor Connections and initialization
 MOTOR_LEFT = BP.PORT_A
 MOTOR_RIGHT = BP.PORT_B
@@ -25,9 +30,13 @@ wait_ready_sensors()
 
 # Initialize global variables
 LOADING_PHASE = False
-DISTANCE_TO_LOADING = 0
 ROTATE_NAVIGATION = False
 POWER_LIMIT = 70
+
+# Pathing global variables
+FRONT_COLLISSION = False
+DISTANCE_TO_LOADING = 0
+tunnel_counter = 0
 
 
 def play_sound(NOTE):
@@ -37,9 +46,34 @@ def play_sound(NOTE):
     NOTE.wait_done()
 
 
-def frontSensor():
+def drive():
+    while True:
+        speed = 200
+        rotation = 360
+        BP.set_motor_limits(MOTOR_LEFT, POWER_LIMIT, speed)
+        BP.set_motor_limits(MOTOR_RIGHT, POWER_LIMIT, speed)
+    return
+   
+    
+def otherTunnel():
+    #rotate the robot a certain amount of cm to the left and select the other tunnel then resume drive
     return
 
+
+def frontSensor():
+    
+    while not FRONT_COLLISSION:
+        distance = FRONT_US.get_cm()
+        
+        #update total distance travelled
+        distance_difference = distance - DISTANCE_TO_LOADING
+        DISTANCE_TO_LOADING += distance_difference
+        
+        #tunnel detected
+        if distance < 20:
+            FRONT_COLLISSION = True
+            tunnel_counter += 1
+            otherTunnel()
             
 
 def loadingPhase():
@@ -103,7 +137,6 @@ def begin_threading_instances():
     run_in_backgroud(lambda: encoder_to_sound(), lambda: drum()) # Both functions that we want running at the same time
 
 
-
 def run_in_backgroud(action: FunctionType, action2: FunctionType):
 
     """
@@ -119,10 +152,11 @@ def run_in_backgroud(action: FunctionType, action2: FunctionType):
     thread2.start()
     return 
 
+
 if __name__ == "__main__":
     
 
     sleep(2)
-    print("Instrument turned on")
+    print("Robot initializing...")
     begin_threading_instances()
     monitor_kill_switch()
