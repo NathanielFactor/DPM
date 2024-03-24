@@ -11,23 +11,20 @@ from types import FunctionType
 BP = brickpi3.BrickPi3() # Initialize the brickPi
 
 # Touch Sensor port connections 
-LOADING_PHASE_BTN = TouchSensor(2)
-EMERGENCY_STOP = TouchSensor(1)
+#LOADING_PHASE_BTN = TouchSensor(1)
+#EMERGENCY_STOP = TouchSensor(1)
 
 # Colour and US Sensor port connections
 COLOR_SENSOR = EV3ColorSensor(3) # port S2
-FRONT_US = EV3UltrasonicSensor(4) # port S3
-SIDE_US = EV3UltrasonicSensor(5) # port S3
+FRONT_US = EV3UltrasonicSensor(1) # port S4
+#SIDE_US = EV3UltrasonicSensor(3) # port S3
 
 # Motor Connections and initialization
 MOTOR_LEFT = BP.PORT_A
 MOTOR_RIGHT = BP.PORT_B
-MOTOR_NAVIGATION = BP.PORT_C
-MOTOR_LAUNCH = BP.PORT_D
-
-# Setup before the robot begins
-print("Done initializing code")
-wait_ready_sensors()
+#MOTOR_NAVIGATION = BP.PORT_C
+MOTOR_LAUNCH = BP.PORT_C
+MOTOR_INTAKE = BP.PORT_D
 
 # Initialize global variables
 LOADING_PHASE = False
@@ -44,6 +41,9 @@ RB = 0.1905
 DISTTODEG = 180/(3.1416*RW)
 ORIENTTODEG = RB/RW
 
+# Setup before the robot begins
+print("Done initializing code")
+wait_ready_sensors()
 
 def play_sound(NOTE):
     
@@ -53,21 +53,23 @@ def play_sound(NOTE):
 
 def moveDistForward(dist):
     try:
+        print("moving forward!")
         speed = 150
-        BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
-        BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(dist*DISTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(dist*DISTTODEG))
-        print("Finished moving: " + dist)
+        print("Finished moving: " + str(dist))
     except IOError as error:
         print(error)
 
 
 def rotateDegreesRight(angle):
     try:
+        print("rotating right")
         speed = 150
-        BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
-        BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(angle*ORIENTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(-angle*ORIENTTODEG))
     except IOError as error:
@@ -75,27 +77,38 @@ def rotateDegreesRight(angle):
         
 def rotateDegreesLeft(angle):
     try:
+        print("rotating left")
         speed = 150
-        BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
-        BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(-angle*ORIENTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(angle*ORIENTTODEG))
     except IOError as error:
         print(error)
 
+def collisionFront():
+    frontUSensor()
 
 def initPath():
     #align the robot with the red tunnel close to the wall
-    rotateDegreesRight(90)
-    moveDistForward(15)
-    rotateDegreesLeft(90)
+    print("starting path")
+    moveDistForward(1)
+    
+    #rotateDegreesRight(45)
+    #sleep(3)
+    #moveDistForward(.15)
+    #sleep(3)
+    #rotateDegreesLeft(45)
+    print("finish test")
 
     
 def otherTunnel():
     #rotate the robot a certain amount of cm to the left and select the other tunnel then resume drive
-    rotateDegreesLeft(90)
-    moveDistForward(20)
-    rotateDegreesRight(90)
+    rotateDegreesLeft(45)
+    sleep(3)
+    moveDistForward(.2)
+    sleep(3)
+    rotateDegreesRight(45)
 
 
 def sideUSensor():
@@ -108,10 +121,11 @@ def sideUSensor():
 
     try:
         wait_ready_sensors()
-        MOTOR_LEFT.set_limits(80, 150) #power, speed
-        MOTOR_RIGHT.set_limits(80, 150)
-        MOTOR_LEFT.reset_encoder()
-        MOTOR_RIGHT.reset_encoder()
+        #BP.set_motor_limits(MOTOR_LEFT, 100, 150)
+        #BP.set_motor_limits(MOTOR_RIGHT, 100, 150)
+        #MOTOR_LEFT.reset_encoder()
+        #MOTOR_RIGHT.reset_encoder()
+        
 
         while True:
             dist = SIDE_US.get_cm()
@@ -146,13 +160,19 @@ def sideUSensor():
 
 
 def frontUSensor():
+    print("entering frontUSensor")
+    sleep(1)
+    FRONT_COLLISSION = False
+    TUNNEL_COUNTER = 0
     
     while not FRONT_COLLISSION:
         distance = FRONT_US.get_cm()
+        moveDistForward(1)
+        print(str(distance))
         
-        #update total distance travelled
-        distance_difference = distance - distanceToLoading
-        distanceToLoading += distance_difference#need to init global variable like this to update value
+        ##update total distance travelled
+        #distance_difference = distance - distanceToLoading
+        #distanceToLoading += distance_difference#need to init global variable like this to update value
         
         #tunnel detected
         if (distance < 20) and ((TUNNEL_COUNTER == 0) or (TUNNEL_COUNTER == 3)):
@@ -164,10 +184,10 @@ def frontUSensor():
         elif (distance < 20) and (TUNNEL_COUNTER == 1):
             FRONT_COLLISSION = True #stop driving thread
             #rotate the robot 90 degrees with the wheels
-            rotateDegreesLeft(90)
+            rotateDegreesLeft(45)
             
             # Time taken to rotate 90 degrees (adjust this based on experimentation)
-            rotation_time = 1.0  # seconds
+            rotation_time = 3  # seconds
             # Wait for the rotation to complete
             sleep(rotation_time)
             # Stop motors
@@ -178,16 +198,15 @@ def frontUSensor():
         elif (distance < 20) and (TUNNEL_COUNTER == 2):
             FRONT_COLLISSION = True #stop driving thread
             #rotate the robot 90 degrees with the wheels
-            speed = 50
+            speed = 150
             BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
             BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
 
             #rotate 90 degrees
-            BP.set_motor_power(MOTOR_LEFT, -speed)
-            BP.set_motor_power(MOTOR_RIGHT, speed)
+            rotateDegreesLeft(45)
             
             # Time taken to rotate 90 degrees (adjust this based on experimentation)
-            rotation_time = 1.0  # seconds
+            rotation_time = 3  # seconds
             # Wait for the rotation to complete
             sleep(rotation_time)
             # Stop motors
@@ -231,16 +250,16 @@ def stopDriving():
 
 #Launch Mechanism
 def launch():
-    while True:
-        if RED_DETECTION:
-            #kill driving
-            for i in range(10): #change 10 to however many balls are loaded
-                BP.set_motor_limits(MOTOR_LAUNCH, 100, 100)
-                BP.set_motor_position_relative(MOTOR_LAUNCH, 20)
-                BP.set_motor_position_relative(MOTOR_LAUNCH, -20)
-                print("launched ball")
-                sleep(5)
-                i += 1
+    sleep(2)
+    RED_DETECTION = True
+    BP.set_motor_limits(MOTOR_LAUNCH, 100, 700)
+    print("forwards")
+    BP.set_motor_position_relative(MOTOR_LAUNCH, 90)
+    sleep(2)
+    print("backwards")
+    BP.set_motor_position_relative(MOTOR_LAUNCH, -90)
+    sleep(2)
+    print("launched ball")
 
 
 #Detects Red Colour
@@ -252,7 +271,43 @@ def colourDetection():
             print("red detected")
             RED_DETECTION = True
             
+def intakeSystem():
+    
+    for i in range(9):
+        print("intaking ball")
+        BP.set_motor_dps(MOTOR_INTAKE, 220)
+        sleep(0.3)
+        
+        BP.set_motor_dps(MOTOR_INTAKE, -220)
+        sleep(0.6)
+        
+        BP.set_motor_dps(MOTOR_INTAKE, 220)
+        sleep(0.3)
+        
+        print("launching")
+        BP.set_motor_dps(MOTOR_INTAKE, 0)
+        launch()
+        sleep(2)
+        
+    print("intaking ball")
+    BP.set_motor_dps(MOTOR_INTAKE, 240)
+    sleep(0.4)
+    
+    BP.set_motor_dps(MOTOR_INTAKE, -245)
+    sleep(0.6)
+    
+    BP.set_motor_dps(MOTOR_INTAKE, 240)
+    sleep(0.4)
+    
+    print("launching")
+    BP.set_motor_dps(MOTOR_INTAKE, 0)
+    launch()
+    sleep(2)
+    
+    reset_brick()
 
+
+'''
 #Kill Switch Implementation
 def monitor_kill_switch():
     """
@@ -282,7 +337,7 @@ def begin_threading_instances():
     """
 
     #fix this last
-    run_in_backgroud(lambda: encoder_to_sound(), lambda: drum()) # Both functions that we want running at the same time
+    run_in_backgroud(lambda: sideUSensor(), lambda: initPath()) # Both functions that we want running at the same time
 
 
 def run_in_backgroud(action: FunctionType, action2: FunctionType):
@@ -291,20 +346,27 @@ def run_in_backgroud(action: FunctionType, action2: FunctionType):
     Run the functions specified in the argument in different threads.
     """
 
-    # Start the thread for playing notes based on motor encoder 
-    thread1= Thread(target=action)
+    # Start the thread for sideUS based on motor encoder 
+    thread1 = Thread(target=action)
     thread1.start()
 
-    # Start the thread for playing the drum on touch sensor actication
-    thread2= Thread(target=action2)
+    # Start the thread for Pathing on touch sensor actication
+    thread2 = Thread(target=action2)
     thread2.start()
     return 
+'''
 
 
 if __name__ == "__main__":
-    
-
+    reset_brick()
+    print("starting")
     sleep(2)
     print("Robot initializing...")
-    initPath()
-    monitor_kill_switch()
+    #collisionFront()
+    #launch()
+    #begin_threading_instances()
+    intakeSystem()
+    
+    
+    #monitor_kill_switch()
+              
