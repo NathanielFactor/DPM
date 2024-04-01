@@ -15,21 +15,21 @@ BP = brickpi3.BrickPi3() # Initialize the brickPi
 #EMERGENCY_STOP = TouchSensor(1)
 
 # Colour and US Sensor port connections
-COLOR_SENSOR = EV3ColorSensor(3) # port S2
+COLOR_SENSOR = EV3ColorSensor(2) # port S2
 FRONT_US = EV3UltrasonicSensor(1) # port S4
-#SIDE_US = EV3UltrasonicSensor(3) # port S3
+SIDE_US = EV3UltrasonicSensor(4) # port S3
 
 # Motor Connections and initialization
 MOTOR_LEFT = BP.PORT_A
 MOTOR_RIGHT = BP.PORT_B
-#MOTOR_NAVIGATION = BP.PORT_C
-MOTOR_LAUNCH = BP.PORT_C
+MOTOR_NAVIGATION = BP.PORT_C
+#MOTOR_LAUNCH = BP.PORT_C
 MOTOR_INTAKE = BP.PORT_D
 
 # Initialize global variables
 LOADING_PHASE = False
 ROTATE_NAVIGATION = False
-POWER_LIMIT = 70
+POWER_LIMIT = 100
 
 # Pathing global variables
 FRONT_COLLISSION = False
@@ -112,6 +112,8 @@ def otherTunnel():
 
 
 def sideUSensor():
+    print("entering function")
+    
     sample_int = 0.2 #sample every 200 ms
     wall_dist = 0.2 #20 cm from wall
     deadband = 0.05 #5 cm tolerance from wall_dist
@@ -119,44 +121,40 @@ def sideUSensor():
     delta_speed = 100 #default change in speed
     us_outlier = 200 #anything outside of 200 cm is ignored
 
-    try:
-        wait_ready_sensors()
-        #BP.set_motor_limits(MOTOR_LEFT, 100, 150)
-        #BP.set_motor_limits(MOTOR_RIGHT, 100, 150)
-        #MOTOR_LEFT.reset_encoder()
-        #MOTOR_RIGHT.reset_encoder()
-        
+    BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+    BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+    moveDistForward(0.1)
 
-        while True:
-            dist = SIDE_US.get_cm()
+    while True:
+        print("entering while loop")
+        dist = SIDE_US.get_raw_value()
+        print(".")
 
-            if dist >= us_outlier:
-                dist = wall_dist
+        if dist >= us_outlier:
+            dist = wall_dist
 
-            dist = dist/100.0
-            error = wall_dist - dist
-            print('dist: {:0.2f}'.format(dist))
-            print('error: {:0.2f}'.format(error))
+        dist = dist/100.0
+        error = wall_dist - dist
+        print('dist: {:0.2f}'.format(dist))
+        print('error: {:0.2f}'.format(error))
 
-            #case1: error is within deadband tolerance: no change
-            if abs(error) <= deadband:
-                MOTOR_LEFT.set_dps(speed)
-                MOTOR_RIGHT.set_dps(speed)
+        #case1: error is within deadband tolerance: no change
+        if abs(error) <= deadband:
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
 
-            #case2: negative error, move closer to wall
-            elif error < 0:
-                MOTOR_LEFT.set_dps(speed)
-                MOTOR_RIGHT.set_dps(speed + delta_speed)
+        #case2: negative error, move closer to wall
+        elif error < 0:
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed + delta_speed)
 
-            #case3: positive error, move further from wall
-            else:
-                MOTOR_LEFT.set_dps(speed + delta_speed)
-                MOTOR_RIGHT.set_dps(speed)
+        #case3: positive error, move further from wall
+        else:
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed + delta_speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
 
-            sleep(sample_int)
+        sleep(sample_int)
 
-    except (KeyboardInterrupt, OSError): #program will exit when Ctrl + C
-        BP.reset_all()
 
 
 def frontUSensor():
@@ -273,7 +271,7 @@ def colourDetection():
             
 def intakeSystem():
     
-    for i in range(9):
+    for i in range(5):
         print("intaking ball")
         BP.set_motor_dps(MOTOR_INTAKE, 220)
         sleep(0.3)
@@ -305,8 +303,7 @@ def intakeSystem():
     sleep(2)
     
     reset_brick()
-
-
+    
 '''
 #Kill Switch Implementation
 def monitor_kill_switch():
@@ -355,7 +352,18 @@ def run_in_backgroud(action: FunctionType, action2: FunctionType):
     thread2.start()
     return 
 '''
-
+def navigationMotor():
+    BP.set_motor_limits(MOTOR_NAVIGATION, 100, 360)
+    
+    print("rotating")
+    BP.set_motor_dps(MOTOR_NAVIGATION, 360)
+    sleep(2)
+    
+    print("turning off")
+    BP.set_motor_dps(MOTOR_NAVIGATION, 0)
+    sleep(2)
+    reset_brick()
+    
 
 if __name__ == "__main__":
     reset_brick()
@@ -365,8 +373,9 @@ if __name__ == "__main__":
     #collisionFront()
     #launch()
     #begin_threading_instances()
-    intakeSystem()
-    
+    #intakeSystem()
+    sideUSensor()
+    #navigationMotor()
     
     #monitor_kill_switch()
               
