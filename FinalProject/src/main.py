@@ -295,7 +295,7 @@ def intakeSystem():
     sleep(0.6)
     
     BP.set_motor_dps(MOTOR_INTAKE, 240)
-    sleep(0.4)
+    sleep(0.21)
     
     print("launching")
     BP.set_motor_dps(MOTOR_INTAKE, 0)
