@@ -47,7 +47,7 @@ RW = 0.0212
 RB = 0.1905
 DISTTODEG = 180/(3.1416*RW)
 ORIENTTODEG = RB/RW
-TUNNEL_COUNTER = 0
+tunnel_counter = 0
 SLEEP_CONSTANT = 8.72 # Seconds/meter -- Determined experimentally 
 SLEEP_CONSTANT_CHANGED = DISTTODEG / speed 
 
@@ -130,14 +130,17 @@ def moving_forward():
     moveDistForward(0.30)
     sleep(1)
 
+'''
+MOVE WITH THE SIDE SNESOR AND CONTANTLY CHECK THE FEONT COLLISION INSIDE THAT FUNCTION
 
-def sideUSensor():
+'''
+def sideUSensor(wallDistance):
     # CHANGED: A refresh / distance checker that can be called. Making adjustments is the same as before
     # Call moveDistForward(0.1) at the end to move with adjustment (can be changed for more/less distance)
     " CALL UPDATES TO THE SIDE SENSOR DISTANCE "
     sample_int = 0.2 #sample every 200 ms
-    wall_dist = 0.2 #20 cm from wall
-    deadband = 0.05 #5 cm tolerance from wall_dist
+    wall_dist = wallDistance #20 cm from wall
+    deadband = 0.025 #2.5 cm tolerance from wall_dist
     speed = 400 #default speed
     delta_speed = 100 #default change in speed
     us_outlier = 200 #anything outside of 200 cm is ignored
@@ -188,50 +191,23 @@ def frontUSensor(counter_fr):
     print("refreshing front US")  
     distance = FRONT_US.get_cm()
     
+    #front collision counter passing through tunnel first time
     if (distance < 20) and ((counter_fr == 0) or (counter_fr == 3)):
-        otherTunnel()
-        return 1 # updates front collision counter
+        tunnel_counter = 1
+        return tunnel_counter
+    
     elif (distance < 20) and (counter_fr == 1):
-        return 2 # updates front collision counter
+        tunnel_counter = 2
+        return tunnel_counter
+    
     elif (distance < 20) and (counter_fr == 2):
-        # counter_fr
-        return 3 
+        tunnel_counter = 3
+        return tunnel_counter
+    
     else:
         # No collision detected, continue moving
         moveDistForward(0.05)
         return counter_fr
-    '''   
-    # First encounter with wall turn left
-    elif (distance < 20) and (TUNNEL_COUNTER == 1):
-        #rotate the robot 90 degrees with the wheels
-        rotateDegreesLeft(45)
-        
-        # Time taken to rotate 90 degrees (adjust this based on experimentation)
-        rotation_time = 3  # seconds
-        # Wait for the rotation to complete
-        sleep(rotation_time)
-        # Stop motors
-        stopDriving()
-        TUNNEL_COUNTER = 2
-    
-    # Second encounter with wall, turn right
-    elif (distance < 20) and (TUNNEL_COUNTER == 2):
-        #rotate the robot 90 degrees with the wheels
-        speed = 150
-        BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
-        BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
-
-        #rotate 90 degrees
-        rotateDegreesLeft(45)
-        
-        # Time taken to rotate 90 degrees (adjust this based on experimentation)
-        rotation_time = 3  # seconds
-        # Wait for the rotation to complete
-        sleep(rotation_time)
-        # Stop motors
-        stopDriving()
-        TUNNEL_COUNTER = 3
-        '''
     
 # CHANGED: Added this loop to call upon refresh
 # distanceToLoading is fed into the call at the start (or can be hard-coded/set in the function)
@@ -294,20 +270,6 @@ def stopDriving():
     BP.set_motor_limits(MOTOR_RIGHT, 0)
 
 
-#Launch Mechanism
-def launch():
-    while True:
-        if RED_DETECTION:
-            #kill driving
-            for i in range(10): #change 10 to however many balls are loaded
-                BP.set_motor_limits(MOTOR_LAUNCH, 100, 100)
-                BP.set_motor_position_relative(MOTOR_LAUNCH, 20)
-                BP.set_motor_position_relative(MOTOR_LAUNCH, -20)
-                print("launched ball")
-                sleep(5)
-                i += 1
-
-
 #Detects Red Colour
 def colourDetection():
     while True:
@@ -366,14 +328,52 @@ def run_in_backgroud(action: FunctionType, action2: FunctionType):
     return 
 '''
 
-if __name__ == "__main__":
 
+def pathingPhaseOne():
+    #align itself with proper tunnel
+    initPath()
+    #move to tunnel this amount
+    moveDistForward(0.9)
+    #switch to other tunnif true
+    otherTunnel()
+    
+    #go through the tunnel
+    moveDistForward(1.2)
+    
+    #turn to phase the loading zone
+    rotateDegreesLeft(90)
+
+    #reach the loading zone
+    moveDistForward(2.4)
+    
+    #turn the robot around at the end of the wall
+    rotateDegreesLeft(180)
+    
+    #end of pathing phase one
+    loadingPhase()
+    
+    
+    
+def pathingPhaseTwo():
+
+    #move to tunnel this amount
+    moveDistForward(2.4)
+    
+    #note we should know which tunnel it is by the tunnel counter
+    # ie) if the tunnel counter is now going to be 3 then there was no collision at the tunnel the first time
+    # ie) if the tunnel counter is now going to be 4 then there was a collision at the tunnel the first time
+    otherTunnel() #shouldnt need this function adjust distance to the right tunnel accordingly
+    
+    #turn to phase the loading zone
+    rotateDegreesLeft(90)
+    
+    #reach the launch zone and use the colour sensor to stop where we want it to
+    moveDistForward(2.7)
+
+
+
+if __name__ == "__main__":
     sleep(2)
     print("Robot initializing...")
-    #initPath()
-    #frontUSensor()
-    #pathingPhase(distanceToLoading)
-    #reset_brick()
-    #sideUSensor()
-    tight_turn_left()
-    # moving_forward()
+    wait_ready_sensors()
+    pathingPhaseOne()
