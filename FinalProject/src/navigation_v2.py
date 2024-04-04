@@ -48,7 +48,7 @@ ORIENTTODEG = RB/RW
 TUNNEL_COUNTER = 0
 SLEEP_CONSTANT = 8.72 # Seconds/meter -- Determined experimentally 
 SLEEP_CONSTANT_CHANGED = DISTTODEG / speed 
-
+SLEEP_CONSTANT_TURN = 0.0277778# seconds/degree
 # CHANGED: Moved outside of the moveDistForward to initializing area at the top 
 # so the adjustments for sideUS can update the values and use moveDistForward to move forward
 
@@ -65,7 +65,7 @@ def moveDistForward(dist):
     try:
         BP.set_motor_position_relative(MOTOR_LEFT, int(dist*DISTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(dist*DISTTODEG))
-        sleep(dist * SLEEP_CONSTANT)
+
         print("Finished moving: " + str(dist))
         
         
@@ -75,12 +75,14 @@ def moveDistForward(dist):
 
 def rotateDegreesRight(angle):
     angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
+    
     try:
         speed = 150
         BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
         BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(angle*ORIENTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(-angle*ORIENTTODEG))
+#      sleep(SLEEP_CONSTANT_TURN * angle)
     except IOError as error:
         print(error)
         
@@ -93,6 +95,7 @@ def rotateDegreesLeft(angle):
         BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(-angle*ORIENTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(angle*ORIENTTODEG))
+#        sleep(SLEEP_CONSTANT_TURN * angle)
     except IOError as error:
         print(error)
 
@@ -116,26 +119,14 @@ def otherTunnel():
     sleep(3)
     rotateDegreesRight(90)
 
-def tight_turn_left():
-    # rotateDegreesLeft(25)
-    # sleep(1)
-    moveDistForward(0.3)
-    rotateDegreesLeft(25)
-    sleep(1)
-
-
-def moving_forward():
-    moveDistForward(0.30)
-    sleep(1)
-
 
 def sideUSensor():
     # CHANGED: A refresh / distance checker that can be called. Making adjustments is the same as before
     # Call moveDistForward(0.1) at the end to move with adjustment (can be changed for more/less distance)
     " CALL UPDATES TO THE SIDE SENSOR DISTANCE "
     sample_int = 0.2 #sample every 200 ms
-    wall_dist = 0.2 #20 cm from wall
-    deadband = 0.05 #5 cm tolerance from wall_dist
+    wall_dist = 0.11 #20 cm from wall
+    deadband = 0.07 #5 cm tolerance from wall_dist
     speed = 400 #default speed
     delta_speed = 100 #default change in speed
     us_outlier = 200 #anything outside of 200 cm is ignored
@@ -149,11 +140,12 @@ def sideUSensor():
 
         dist = dist/100.0
         error = wall_dist - dist
-        print('dist: {:0.2f}'.format(dist))
+        print('\ndist: {:0.2f}'.format(dist))
         print('error: {:0.2f}'.format(error))
 
         #case1: error is within deadband tolerance: no change
         if abs(error) <= deadband:
+            moveDistForward(0.1)
             BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
             BP.set_motor_limits(MOTOR_LEFT, 100, speed)
 
@@ -169,10 +161,7 @@ def sideUSensor():
             BP.set_motor_limits(MOTOR_RIGHT, 100, speed + delta_speed)
             BP.set_motor_limits(MOTOR_LEFT, 100, speed)
 
-        moveDistForward(0.1)
-        BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
-        BP.set_motor_limits(MOTOR_LEFT, 100, speed)
-    
+
     except IOError as error:
         print(error)
 
@@ -351,14 +340,31 @@ def run_in_backgroud(action: FunctionType, action2: FunctionType):
     return 
 '''
 
+
+def tight_turn_left():
+    rotateDegreesLeft(20)
+    sleep(3)
+    moveDistForward(0.20)
+    sleep(0.20 * SLEEP_CONSTANT)
+    rotateDegreesLeft(20)
+    sleep(3)
+    moveDistForward(0.78)
+    sleep(0.78 * SLEEP_CONSTANT)
+    rotateDegreesRight(40)
+    sleep(3)
+    moveDistForward(0.20)
+    sleep(0.20 * SLEEP_CONSTANT)
+
 if __name__ == "__main__":
 
     sleep(2)
     print("Robot initializing...")
     #initPath()
     #frontUSensor()
-    #pathingPhase(distanceToLoading)
+    # pathingPhase(distanceToLoading)
     #reset_brick()
-    #sideUSensor()
-    tight_turn_left()
+
+    while True:
+        sideUSensor()
+    # tight_turn_left()
     # moving_forward()
