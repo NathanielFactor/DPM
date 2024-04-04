@@ -35,10 +35,12 @@ LOADING_PHASE = False
 ROTATE_NAVIGATION = False
 POWER_LIMIT = 70
 
-# Pathing global variables
 speed = 300
 
-FRONT_COLLISSION = False
+# Pathing global variables
+totalDistTravelled = 10 # Total distance travelled tracker
+frontCollisionCounter = 0  # Number of front collisions detected
+
 distanceToLoading = 10
 RED_DETECTION = False
 RW = 0.0212
@@ -177,31 +179,30 @@ def sideUSensor():
         print(error)
 
 
-def frontUSensor(TUNNEL_COUNTER):
-    # CHANGED: A refresh / distance checker with the TUNNEL_COUNTER conditions that can be later implemented
-    # Return value is used as TUNNEL_COUNTER call in the loop (later), so the value is updated as before
-    # Not sure what the tunnel counter was doing before, so I left them empty, but can be easily implemented
-    """ CALL TO UPDATE COLLISIONS WITH FRONT US SENSOR """
+def frontUSensor(counter_fr):
+    """ Checks the front US sensor for collisions and moves incrementally forward 
+        Parameter: counter_fr to track the number of front collisions detected
+        Returns: updated counter_fr if collisions were detected
+    """
+
     print("refreshing front US")  
     distance = FRONT_US.get_cm()
     
-    if (distance < 20) and ((TUNNEL_COUNTER == 0) or (TUNNEL_COUNTER == 3)):
+    if (distance < 20) and ((counter_fr == 0) or (counter_fr == 3)):
         otherTunnel()
-        return 1 # updates TUNNEL_COUNTER
-    elif (distance < 20) and (TUNNEL_COUNTER == 1):
-        # TUNNEL_COUNTER == 1
-        return 2 # updates TUNNEL_COUNTER
-    elif (distance < 20) and (TUNNEL_COUNTER == 2):
-        # TUNNEL_COUNTER == 2
-        return 3
+        return 1 # updates front collision counter
+    elif (distance < 20) and (counter_fr == 1):
+        return 2 # updates front collision counter
+    elif (distance < 20) and (counter_fr == 2):
+        # counter_fr
+        return 3 
     else:
         # No collision detected, continue moving
-        moveDistForward(0.1)
-        return TUNNEL_COUNTER
+        moveDistForward(0.05)
+        return counter_fr
     '''   
     # First encounter with wall turn left
     elif (distance < 20) and (TUNNEL_COUNTER == 1):
-        FRONT_COLLISSION = True #stop driving thread
         #rotate the robot 90 degrees with the wheels
         rotateDegreesLeft(45)
         
@@ -215,7 +216,6 @@ def frontUSensor(TUNNEL_COUNTER):
     
     # Second encounter with wall, turn right
     elif (distance < 20) and (TUNNEL_COUNTER == 2):
-        FRONT_COLLISSION = True #stop driving thread
         #rotate the robot 90 degrees with the wheels
         speed = 150
         BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
@@ -237,13 +237,28 @@ def frontUSensor(TUNNEL_COUNTER):
 # distanceToLoading is fed into the call at the start (or can be hard-coded/set in the function)
 # and each call to sideUSensor and frontUSensor will moveDistForward(0.1), and this will update the distanceToLoading
 # While loop runs until distanceToLoading = 0 (at Loading Zone)
-def pathingPhase(distanceToLoading):
-    TUNNEL_COUNTER = 0
-    while distanceToLoading != 0:
+def pathingPhase(totalDistTravelled):
+    frontCollisionCounter = 0
+    # frontCollision Counter code: 
+    # 0: before tunnel, 1: past tunnel, 2: past 1st corner, 3: STOP
+
+    # Distance values to turn know when to turn off the sideUS
+    distToTunnel = 10 # distance travelled by robot before tunnel (UNDERESTIMATE)
+    distPastTunnel = 20 # distance travelled by robot after clearing tunnel (OVERESTIMATE)
+    sideErrorTunnel = 0.05 # error to scan for distance from wall inside tunnel
+    
+    while frontCollisionCounter < 3:
+        if (frontCollisionCounter == 0) and (totalDistTravelled > distToTunnel):
+            # Robot travelled to first tunnel area without encountering, continue forward without sideUS
+            while totalDistTravelled < distPastTunnel:
+                # move with only side US active
+                sideUSensor()
+                totalDistTravelled += 0.1
+            frontCollisionCounter = 1 # cleared tunnel
         sleep(0.2)
         sideUSensor() # Check the side sensor
         TUNNEL_COUNTER = frontUSensor(TUNNEL_COUNTER) # Check front sensor
-        distanceToLoading -= 0.2
+        totalDistTravelled += 0.2
     
 #Enter Loading Phase Initiation           
 def loadingPhase():
