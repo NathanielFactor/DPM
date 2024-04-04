@@ -252,12 +252,12 @@ def pathingPhase(totalDistTravelled):
             # Robot travelled to first tunnel area without encountering, continue forward without sideUS
             while totalDistTravelled < distPastTunnel:
                 # move with only side US active
-                sideUSensor()
-                totalDistTravelled += 0.1
+                sideUSensor(sideErrorTunnel)
+                totalDistTravelled += 0.05
             frontCollisionCounter = 1 # cleared tunnel
-        sleep(0.2)
+        
+        frontCollisionCounter = frontUSensor(frontCollisionCounter)
         sideUSensor() # Check the side sensor
-        TUNNEL_COUNTER = frontUSensor(TUNNEL_COUNTER) # Check front sensor
         totalDistTravelled += 0.2
     
 #Enter Loading Phase Initiation           
