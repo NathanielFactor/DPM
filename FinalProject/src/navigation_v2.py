@@ -67,6 +67,7 @@ def moveDistForward(dist):
 
 
 def rotateDegreesRight(angle):
+    angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
         speed = 150
         BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
@@ -77,6 +78,8 @@ def rotateDegreesRight(angle):
         print(error)
         
 def rotateDegreesLeft(angle):
+
+    angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
         speed = 150
         BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
@@ -94,7 +97,9 @@ def initPath():
     moveDistForward(.15)
     sleep(3)
     rotateDegreesLeft(45)
-    print("finish test")
+    print("finish test"
+
+
 
     
 def otherTunnel():
