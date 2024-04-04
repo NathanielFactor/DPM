@@ -39,7 +39,7 @@ POWER_LIMIT = 70
 FRONT_COLLISSION = False
 distanceToLoading = 10
 RED_DETECTION = False
-RW = 0.025
+RW = 0.0212
 RB = 0.1905
 DISTTODEG = 180/(3.1416*RW)
 ORIENTTODEG = RB/RW
@@ -62,6 +62,7 @@ def moveDistForward(dist):
         BP.set_motor_position_relative(MOTOR_LEFT, int(dist*DISTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(dist*DISTTODEG))
         print("Finished moving: " + str(dist))
+        
     except IOError as error:
         print(error)
 
@@ -92,24 +93,40 @@ def rotateDegreesLeft(angle):
 
 def initPath():
     #align the robot with the red tunnel close to the wall
-    rotateDegreesRight(45)
+    rotateDegreesRight(90)
     sleep(3)
     moveDistForward(.15)
     sleep(3)
-    rotateDegreesLeft(45)
-    print("finish test"
-
-
-
+    rotateDegreesLeft(90)
+    print("finish test")
     
+
 def otherTunnel():
     #rotate the robot a certain amount of cm to the left and select the other tunnel then resume drive
     print("Enter other tunnel")
-    rotateDegreesLeft(45)
+    rotateDegreesLeft(90)
     sleep(3)
     moveDistForward(.2)
     sleep(3)
-    rotateDegreesRight(45)
+    rotateDegreesRight(90)
+
+def tight_turn_left():
+    rotateDegreesLeft(25)
+    sleep(1)
+    moveDistForward(2)
+    sleep(3)
+    rotateDegreesLeft(25)
+    sleep(1)
+    moveDistForward(2)
+    sleep(3)
+    rotateDegreesRight(25)
+    sleep(1)
+    rotateDegreesRight(25)
+    sleep(1)
+
+def moving_forward():
+    moveDistForward(0.6)
+    sleep(20)
 
 
 def sideUSensor():
@@ -340,6 +357,8 @@ if __name__ == "__main__":
     print("Robot initializing...")
     #initPath()
     #frontUSensor()
-    pathingPhase(distanceToLoading)
+    #pathingPhase(distanceToLoading)
     #reset_brick()
     #sideUSensor()
+    #tight_turn_left()
+    moving_forward()
