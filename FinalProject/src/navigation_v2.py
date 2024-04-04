@@ -36,6 +36,8 @@ ROTATE_NAVIGATION = False
 POWER_LIMIT = 70
 
 # Pathing global variables
+speed = 300
+
 FRONT_COLLISSION = False
 distanceToLoading = 10
 RED_DETECTION = False
@@ -44,10 +46,12 @@ RB = 0.1905
 DISTTODEG = 180/(3.1416*RW)
 ORIENTTODEG = RB/RW
 TUNNEL_COUNTER = 0
+SLEEP_CONSTANT = 8.72 # Seconds/meter -- Determined experimentally 
+SLEEP_CONSTANT_CHANGED = DISTTODEG / speed 
 
 # CHANGED: Moved outside of the moveDistForward to initializing area at the top 
 # so the adjustments for sideUS can update the values and use moveDistForward to move forward
-speed = 300
+
 BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
 BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
 
@@ -61,7 +65,9 @@ def moveDistForward(dist):
     try:
         BP.set_motor_position_relative(MOTOR_LEFT, int(dist*DISTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(dist*DISTTODEG))
+        sleep(dist * SLEEP_CONSTANT)
         print("Finished moving: " + str(dist))
+        
         
     except IOError as error:
         print(error)
@@ -111,22 +117,16 @@ def otherTunnel():
     rotateDegreesRight(90)
 
 def tight_turn_left():
+    # rotateDegreesLeft(25)
+    # sleep(1)
+    moveDistForward(0.3)
     rotateDegreesLeft(25)
-    sleep(1)
-    moveDistForward(2)
-    sleep(3)
-    rotateDegreesLeft(25)
-    sleep(1)
-    moveDistForward(2)
-    sleep(3)
-    rotateDegreesRight(25)
-    sleep(1)
-    rotateDegreesRight(25)
     sleep(1)
 
+
 def moving_forward():
-    moveDistForward(0.6)
-    sleep(20)
+    moveDistForward(0.30)
+    sleep(1)
 
 
 def sideUSensor():
@@ -360,5 +360,5 @@ if __name__ == "__main__":
     #pathingPhase(distanceToLoading)
     #reset_brick()
     #sideUSensor()
-    #tight_turn_left()
-    moving_forward()
+    tight_turn_left()
+    # moving_forward()
