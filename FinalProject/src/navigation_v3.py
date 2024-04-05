@@ -17,7 +17,7 @@ BP = brickpi3.BrickPi3() # Initialize the brickPi
 # Colour and US Sensor port connections
 COLOR_SENSOR = EV3ColorSensor(2) # port S2
 FRONT_US = EV3UltrasonicSensor(1) # port S1
-SIDE_US = EV3UltrasonicSensor(4) # port S4
+SIDE_US = EV3UltrasonicSensor(3) # port S3
 
 # Motor Connections and initialization
 MOTOR_LEFT = BP.PORT_A
@@ -124,65 +124,51 @@ def tight_turn_left():
     rotateDegreesLeft(25)
     sleep(1)
 
-def rotateNavigationMotor(degrees):
-    BP.set_motor_limits(MOTOR_NAVIGATION, 100, degrees)
+def rotateNavigationMotor(degrees, sleepTime=0.5):
+    BP.set_motor_limits(MOTOR_NAVIGATION, 150, degrees)
     degrees = degrees * 2
     
     print("rotating")
     BP.set_motor_dps(MOTOR_NAVIGATION, degrees)
-    sleep(0.5)
+    sleep(sleepTime)
     
     print("finished rotating")
     BP.set_motor_dps(MOTOR_NAVIGATION, 0)
-    sleep(2)
 
 def tunnelDetection():
-    sleep(2)
+    # sleep(2)
     rotateNavigationMotor(-135)
     left_tunnel = SIDE_US.get_value()
-    print(left_tunnel)
+    print("Left Tunnel Dist: " + str(left_tunnel))
     
-    
-    sleep(2)
-    rotateNavigationMotor(95)
+    sleep(1)
+    rotateNavigationMotor(90)
     right_tunnel = SIDE_US.get_value()
-    print(right_tunnel)
+    print("Left Tunnel Dist: " + str(right_tunnel))
+    
+    sleep(1)
+    rotateNavigationMotor(40,0.65)
 
     if left_tunnel > right_tunnel:
         return 0
     else:
         return 1
 
-def moving_forward():
-    startingDist = FRONT_US.get_cm()
-    print("Starting dist: " + str(startingDist))
-    frontUSensor(0)
-    sideUSensor(0.2)
-    frontUSensor(0)
-    sideUSensor(0.2)
-    endDist = FRONT_US.get_cm()
-    print("Finishing dist: " + str(endDist))
-    
-    print("DIFFERENCE: " + str(endDist - startingDist))
-    sleep(1)
 
-'''
-MOVE WITH THE SIDE SNESOR AND CONTANTLY CHECK THE FEONT COLLISION INSIDE THAT FUNCTION
-
-'''
-def sideUSensor(wallDistance):
+def sideUSensor(wallDistance=0.3):
     # CHANGED: A refresh / distance checker that can be called. Making adjustments is the same as before
     # Call moveDistForward(0.1) at the end to move with adjustment (can be changed for more/less distance)
     " CALL UPDATES TO THE SIDE SENSOR DISTANCE "
-    wall_dist = wallDistance #20 cm from wall
-    deadband = 0.02 #2.5 cm tolerance from wall_dist
+    wall_dist = wallDistance
+    deadband = 0.02 #2 cm tolerance from wall_dist
     speed = 400 #default speed
     delta_speed = 100 #default change in speed
     us_outlier = 200 #anything outside of 200 cm is ignored
 
     try:
         print("Refreshing side US")
-        dist = SIDE_US.get_value()
+        sleep(0.2)
+        dist = SIDE_US.get_cm()
 
         if dist >= us_outlier:
             dist = wall_dist
@@ -196,6 +182,7 @@ def sideUSensor(wallDistance):
         if abs(error) <= deadband:
             BP.set_motor_limits(MOTOR_LEFT, 100, speed)
             BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+            moveDistForward(0.1)
 
         #case2: negative error, move closer to wall
         elif error < 0:
@@ -220,16 +207,14 @@ def frontUSensor(counter_fr):
         Parameter: counter_fr to track the number of front collisions detected
         Returns: updated counter_fr if collisions were detected
     """
-
-    print("COUNTER: " + str(counter_fr))  
     distance = FRONT_US.get_cm()
 
     #front collision counter passing through tunnel first time
-    if (distance < 25): # collection detected
-        print("Collision detected at: " + str(distance))
+    if (distance < 20): 
+        # collection detected
+        stopDriving()
         if (counter_fr == 0): # before the first tunnel
-            # go to other tunnel
-            stopDriving()
+            # navigate the tunnel
             tunnel = tunnelDetection()
             if tunnel == 0:
                 #hardcode the path into the left tunnel
@@ -247,12 +232,12 @@ def frontUSensor(counter_fr):
                 sleep(4)
                 rotateDegreesLeft(75)
                 sleep(4)
-            rotateNavigationMotor(45)
             counter_fr = 1
         
         elif (counter_fr == 1): # after first tunnel
             # navigate the corner
-            reset_brick()
+            rotateDegreesLeft(75)
+            sleep(4)
             counter_fr = 2
         
         elif (counter_fr == 2): # after corner
@@ -273,17 +258,21 @@ def pathingPhase():
     sideErrorTunnel = 0.05 # error to scan for distance from wall inside tunnel
     
     while frontCollisionCounter < 3:
+        sleep(0.5)
         frontCollisionCounter = frontUSensor(frontCollisionCounter)
         moveDistForward(0.1)
-        sideUSensor(0.3) # Check the side sensor
-        sleep(0.5)
-        
-
+        if (frontCollisionCounter == 1): # tunnel to corner path
+            sideUSensor(0.1) # Check the side sensor
+            
+        else:
+            moveDistForward(0.1)
+            sideUSensor(0.3) # Check the side sensor
+    
 
 #Stops Driving Motors
 def stopDriving():
-    BP.set_motor_limits(MOTOR_LEFT, 0)
-    BP.set_motor_limits(MOTOR_RIGHT, 0)
+    BP.set_motor_limits(MOTOR_LEFT, 20, 0)
+    BP.set_motor_limits(MOTOR_RIGHT, 20, 0)
 
 
 #Detects Red Colour
@@ -300,6 +289,10 @@ def colourDetection():
 if __name__ == "__main__":
     sleep(2)
     print("Robot initializing...")
-    wait_ready_sensors()
-    pathingPhase()
     #reset_brick()
+    wait_ready_sensors(True)
+    moveDistForward(0.1)
+    stopDriving()
+    #pathingPhase()
+    #tunnelDetection()
+    reset_brick()
