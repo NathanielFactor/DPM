@@ -67,7 +67,7 @@ def moveDistForward(dist):
     try:
         BP.set_motor_position_relative(MOTOR_LEFT, int(dist*DISTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(dist*DISTTODEG))
-        sleep(dist * SLEEP_CONSTANT)
+        #sleep(dist * SLEEP_CONSTANT)
         print("Finished moving: " + str(dist))
         
         
@@ -194,10 +194,12 @@ def frontUSensor(counter_fr):
     #front collision counter passing through tunnel first time
     if (distance < 20) and ((counter_fr == 0) or (counter_fr == 3)):
         tunnel_counter = 1
+        otherTunnel()
         return tunnel_counter
     
     elif (distance < 20) and (counter_fr == 1):
         tunnel_counter = 2
+        rotateDegreesLeft(90)
         return tunnel_counter
     
     elif (distance < 20) and (counter_fr == 2):
@@ -205,10 +207,34 @@ def frontUSensor(counter_fr):
         return tunnel_counter
     
     else:
-        # No collision detected, continue moving
-        moveDistForward(0.05)
-        return counter_fr
+        return tunnel_counter
     
+    
+def frontUSensor2(counter_fr):
+    """ Checks the front US sensor for collisions and moves incrementally forward 
+        Parameter: counter_fr to track the number of front collisions detected
+        Returns: updated counter_fr if collisions were detected
+    """
+    print("refreshing front US")  
+    distance = FRONT_US.get_cm()
+    
+    #front collision counter passing through tunnel first time
+    if (distance < 20) and ((counter_fr == 0) or (counter_fr == 3)):
+        tunnel_counter = 1
+        otherTunnel()
+        return tunnel_counter
+    
+    elif (distance < 20) and (counter_fr == 1):
+        tunnel_counter = 2
+        rotateDegreesLeft(90)
+        return tunnel_counter
+    
+    elif (distance < 20) and (counter_fr == 2):
+        tunnel_counter = 3
+        return tunnel_counter
+    
+    else:
+        return tunnel_counter
 # CHANGED: Added this loop to call upon refresh
 # distanceToLoading is fed into the call at the start (or can be hard-coded/set in the function)
 # and each call to sideUSensor and frontUSensor will moveDistForward(0.1), and this will update the distanceToLoading
@@ -225,7 +251,7 @@ def pathingPhase(totalDistTravelled):
     
     while frontCollisionCounter < 3:
         if (frontCollisionCounter == 0) and (totalDistTravelled > distToTunnel):
-            # Robot travelled to first tunnel area without encountering, continue forward without sideUS
+            # Robot travelled to first tunnel area without encountering, continue forward with sideUS
             while totalDistTravelled < distPastTunnel:
                 # move with only side US active
                 sideUSensor(sideErrorTunnel)
@@ -235,6 +261,11 @@ def pathingPhase(totalDistTravelled):
         frontCollisionCounter = frontUSensor(frontCollisionCounter)
         sideUSensor() # Check the side sensor
         totalDistTravelled += 0.2
+        
+    #reached loading phase
+    stopDriving()
+    rotateDegreesLeft(180)
+    loadingPhase()
     
 #Enter Loading Phase Initiation           
 def loadingPhase():
@@ -244,30 +275,67 @@ def loadingPhase():
     loading phase and continue pathing back to the launching phase.
     """
 
-    LOADING_PHASE = False
+    loadingPhase = False
     
-    while True:
+    while not loadingPhase:
         #note this detection for distance will be in the drive() function not in here!
-        if distanceToLoading == 420:
-            LOADING_PHASE = True 
-            
-        while LOADING_PHASE: # If button pressed, motor will continuously drum
-            print("entering loading phase...")
-            play_sound("A")
-            # kill all other threads
-            
-            if LOADING_PHASE_BTN.is_pressed():
-                print("leaving loading phase")
-                # rotate the navingation system
-                BP.set_motor_limits(MOTOR_NAVIGATION,POWER_LIMIT,500)
-                BP.set_motor_position_relative(MOTOR_NAVIGATION, 180)
-                LOADING_PHASE = False
+        if FRONT_US.get_cm() < 5:
+            loadingPhase = True
+        sleep(1)
+        
+    #rotate the sideUS sensor motor 
+    rotateNavigationMotor()
+    pathingPhaseTwo()
+    
+    
+def pathingPhaseTwo():
+    frontCollisionCounter = 0
+    # frontCollision Counter code: 
+    # 0: before tunnel, 1: past tunnel, 2: past 1st corner, 3: STOP
 
+    # Distance values to turn know when to turn off the sideUS
+    distToTunnel = 0.9 # distance travelled by robot before tunnel (UNDERESTIMATE)
+    distPastTunnel = 1.1 # distance travelled by robot after clearing tunnel (OVERESTIMATE)
+    sideErrorTunnel = 0.05 # error to scan for distance from wall inside tunnel
+    
+    while frontCollisionCounter < 3:
+        if (frontCollisionCounter == 0) and (totalDistTravelled > distToTunnel):
+            # Robot travelled to first tunnel area without encountering, continue forward with sideUS
+            while totalDistTravelled < distPastTunnel:
+                # move with only side US active
+                sideUSensor(sideErrorTunnel)
+                totalDistTravelled += 0.05
+            frontCollisionCounter = 1 # cleared tunnel
+        
+        frontCollisionCounter = frontUSensor(frontCollisionCounter)
+        sideUSensor() # Check the side sensor
+        totalDistTravelled += 0.2
+        
+    #reached loading phase
+    stopDriving()
+    rotateDegreesLeft(180)
+    loadingPhase()
+    
 
+def rotateNavigationMotor():
+    BP.set_motor_limits(MOTOR_NAVIGATION, 100, 360)
+    
+    print("rotating")
+    BP.set_motor_dps(MOTOR_NAVIGATION, 360)
+    sleep(2)
+    
+    print("turning off")
+    BP.set_motor_dps(MOTOR_NAVIGATION, 0)
+    sleep(2)
+    reset_brick()        
+        
+        
+        
 #Stops Driving Motors
 def stopDriving():
     BP.set_motor_limits(MOTOR_LEFT, 0)
     BP.set_motor_limits(MOTOR_RIGHT, 0)
+
 
 
 #Detects Red Colour
@@ -278,6 +346,8 @@ def colourDetection():
         if red_lvl > 30:
             print("red detected")
             RED_DETECTION = True
+            
+            
             
 '''
 #Kill Switch Implementation
@@ -326,14 +396,16 @@ def run_in_backgroud(action: FunctionType, action2: FunctionType):
     thread2= Thread(target=action2)
     thread2.start()
     return 
-'''
+
 
 
 def pathingPhaseOne():
     #align itself with proper tunnel
     initPath()
+    
     #move to tunnel this amount
     moveDistForward(0.9)
+    
     #switch to other tunnif true
     otherTunnel()
     
@@ -349,8 +421,6 @@ def pathingPhaseOne():
     #turn the robot around at the end of the wall
     rotateDegreesLeft(180)
     
-    #end of pathing phase one
-    loadingPhase()
     
     
     
@@ -369,6 +439,7 @@ def pathingPhaseTwo():
     
     #reach the launch zone and use the colour sensor to stop where we want it to
     moveDistForward(2.7)
+'''
 
 
 
@@ -376,4 +447,4 @@ if __name__ == "__main__":
     sleep(2)
     print("Robot initializing...")
     wait_ready_sensors()
-    pathingPhaseOne()
+    pathingPhase()
