@@ -79,8 +79,8 @@ def rotateDegreesRight(angle):
     angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
         speed = 150
-        BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
-        BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(angle*ORIENTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(-angle*ORIENTTODEG))
     except IOError as error:
@@ -90,8 +90,8 @@ def rotateDegreesLeft(angle):
     angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
         speed = 150
-        BP.set_motor_limits(MOTOR_LEFT, 80, speed)  # Adjust as needed
-        BP.set_motor_limits(MOTOR_RIGHT, 80, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+        BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(-angle*ORIENTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(angle*ORIENTTODEG))
     except IOError as error:
@@ -100,11 +100,11 @@ def rotateDegreesLeft(angle):
 
 def initPath():
     #align the robot with the red tunnel close to the wall
-    rotateDegreesRight(90)
+    rotateDegreesRight(75)
     sleep(3)
     moveDistForward(.15)
     sleep(3)
-    rotateDegreesLeft(90)
+    rotateDegreesLeft(75)
     print("finish test")
     
 
@@ -126,17 +126,27 @@ def tight_turn_left():
 
 def rotateNavigationMotor(degrees):
     BP.set_motor_limits(MOTOR_NAVIGATION, 100, degrees)
+    degrees = degrees * 2
     
+    print("rotating")
     BP.set_motor_dps(MOTOR_NAVIGATION, degrees)
-    sleep(1)
+    sleep(0.5)
+    
+    print("finished rotating")
     BP.set_motor_dps(MOTOR_NAVIGATION, 0)
+    sleep(2)
 
 def tunnelDetection():
+    sleep(2)
+    rotateNavigationMotor(-135)
+    left_tunnel = SIDE_US.get_value()
+    print(left_tunnel)
     
-    rotateNavigationMotor(-120)
-    left_tunnel = FRONT_US.get_cm()
-    rotateNavigationMotor(30)
-    right_tunnel = FRONT_US.get_cm()
+    
+    sleep(2)
+    rotateNavigationMotor(95)
+    right_tunnel = SIDE_US.get_value()
+    print(right_tunnel)
 
     if left_tunnel > right_tunnel:
         return 0
@@ -164,9 +174,8 @@ def sideUSensor(wallDistance):
     # CHANGED: A refresh / distance checker that can be called. Making adjustments is the same as before
     # Call moveDistForward(0.1) at the end to move with adjustment (can be changed for more/less distance)
     " CALL UPDATES TO THE SIDE SENSOR DISTANCE "
-    sample_int = 0.2 #sample every 200 ms
     wall_dist = wallDistance #20 cm from wall
-    deadband = 0.025 #2.5 cm tolerance from wall_dist
+    deadband = 0.02 #2.5 cm tolerance from wall_dist
     speed = 400 #default speed
     delta_speed = 100 #default change in speed
     us_outlier = 200 #anything outside of 200 cm is ignored
@@ -180,8 +189,8 @@ def sideUSensor(wallDistance):
 
         dist = dist/100.0
         error = wall_dist - dist
-        #print('dist: {:0.2f}'.format(dist))
-        #print('error: {:0.2f}'.format(error))
+        print('dist: {:0.2f}'.format(dist))
+        print('error: {:0.2f}'.format(error))
 
         #case1: error is within deadband tolerance: no change
         if abs(error) <= deadband:
@@ -216,25 +225,34 @@ def frontUSensor(counter_fr):
     distance = FRONT_US.get_cm()
 
     #front collision counter passing through tunnel first time
-    if (distance < 20): # collection detected
+    if (distance < 25): # collection detected
         print("Collision detected at: " + str(distance))
         if (counter_fr == 0): # before the first tunnel
             # go to other tunnel
+            stopDriving()
             tunnel = tunnelDetection()
             if tunnel == 0:
                 #hardcode the path into the left tunnel
-                rotateDegreesLeft(90)
+                rotateDegreesLeft(75)
+                sleep(4)
                 moveDistForward(0.15)
-                rotateDegreesRight(90)
+                sleep(4)
+                rotateDegreesRight(75)
+                sleep(4)
             else:
                 #hardcode the path into the right tunnel
-                rotateDegreesRight(90)
+                rotateDegreesRight(75)
+                sleep(4)
                 moveDistForward(0.15)
-                rotateDegreesLeft(90)
+                sleep(4)
+                rotateDegreesLeft(75)
+                sleep(4)
+            rotateNavigationMotor(45)
             counter_fr = 1
         
         elif (counter_fr == 1): # after first tunnel
             # navigate the corner
+            reset_brick()
             counter_fr = 2
         
         elif (counter_fr == 2): # after corner
@@ -256,9 +274,9 @@ def pathingPhase():
     
     while frontCollisionCounter < 3:
         frontCollisionCounter = frontUSensor(frontCollisionCounter)
-        sideUSensor(0.2) # Check the side sensor
         moveDistForward(0.1)
-        sleep(0.2)
+        sideUSensor(0.3) # Check the side sensor
+        sleep(0.5)
         
 
 
@@ -284,4 +302,4 @@ if __name__ == "__main__":
     print("Robot initializing...")
     wait_ready_sensors()
     pathingPhase()
-    #moving_forward()
+    #reset_brick()
