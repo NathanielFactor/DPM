@@ -153,9 +153,27 @@ def tunnelDetection():
         return 0
     else:
         return 1
+def tunnelDetection2():
+    # sleep(2)
+    rotateNavigationMotor(+155)
+    left_tunnel = SIDE_US.get_value()
+    print("Left Tunnel Dist: " + str(left_tunnel))
+    
+    sleep(1)
+    rotateNavigationMotor(-110)
+    right_tunnel = SIDE_US.get_value()
+    print("Right Tunnel Dist: " + str(right_tunnel))
+    
+    sleep(1)
+    rotateNavigationMotor(-35,0.65)
+
+    if left_tunnel > right_tunnel:
+        return 0
+    else:
+        return 1
 
 
-def sideUSensor(wallDistance=0.3):
+def sideUSensorRight(wallDistance=0.3):
     # CHANGED: A refresh / distance checker that can be called. Making adjustments is the same as before
     # Call moveDistForward(0.1) at the end to move with adjustment (can be changed for more/less distance)
     " CALL UPDATES TO THE SIDE SENSOR DISTANCE "
@@ -202,6 +220,53 @@ def sideUSensor(wallDistance=0.3):
     except IOError as error:
         print(error)
         
+def sideUSensorLeft(wallDistance=0.3):
+    # CHANGED: A refresh / distance checker that can be called. Making adjustments is the same as before
+    # Call moveDistForward(0.1) at the end to move with adjustment (can be changed for more/less distance)
+    " CALL UPDATES TO THE SIDE SENSOR DISTANCE "
+    wall_dist = wallDistance
+    deadband = 0.01 #2 cm tolerance from wall_dist
+    speed = 400 #default speed
+    delta_speed = 100 #default change in speed
+    us_outlier = 200 #anything outside of 200 cm is ignored
+
+    try:
+        print("\nRefreshing side US")
+        sleep(0.2)
+        dist = SIDE_US.get_cm()
+
+        if dist >= us_outlier:
+            dist = wall_dist
+
+        dist = dist/100.0
+        error = wall_dist - dist
+        print('dist: {:0.2f}'.format(dist))
+        print('error: {:0.2f}'.format(error))
+
+        #case1: error is within deadband tolerance: no change
+        if abs(error) <= deadband:
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            moveDistForward(0.1)
+
+        #case2: negative error, move closer to wall
+        elif error < 0:
+            print("Adjust closer")
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed + delta_speed)
+            moveDistForward(0.1)
+
+        #case3: positive error, move further from wall
+        else:
+            print("Adjust further")
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed + delta_speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+            moveDistForward(0.1)
+
+    
+    except IOError as error:
+        print(error)
+        
 def action(frontCollisionCounter):
     throughtunnel = True
     passing = True
@@ -213,10 +278,10 @@ def action(frontCollisionCounter):
         #detect tunnel
         if frontCollisionCounter == 0:
             moveDistForward(0.1)
-            sideUSensor(0.3)
+            sideUSensorRight(0.3)
             print(distance)
             sleep(0.2)
-            if distance < 30:
+            if distance < 25:
                 stopDriving()
                 tunnel = tunnelDetection()
                 if tunnel == 0:
@@ -260,7 +325,7 @@ def action(frontCollisionCounter):
             while True:
                 print(" The distance after turning is", distance)
                 moveDistForward(0.1)
-                sideUSensor(0.3)
+                sideUSensorRight(0.3)
                 sleep(0.2)
                 distance = FRONT_US.get_cm()
                 if distance < 15:
@@ -271,76 +336,82 @@ def action(frontCollisionCounter):
                     sleep(5)
                     frontCollisionCounter = 3
                     break
-            
+                
+    loadingPhase()
+        
+        
+def loadingPhase():
+    loadingPhase = False
+    while not loadingPhase:
+        if FRONT_US.get_cm() < 5:
+            loadingPhase = True
+        sleep(0.5)
+    rotateNavigationMotor(-155)
+    action2(0)
+    
+    
 def action2(frontCollisionCounter):
     throughtunnel = True
     passing = True
     while frontCollisionCounter < 3:
         distance = FRONT_US.get_cm()
 
-        
+        if frontCollisionCounter == 0:
+            while True:
+                print(" The distance after turning is", distance)
+                moveDistForward(0.1)
+                sideUSensorLeft(0.3)
+                sleep(0.2)
+                distance = FRONT_US.get_cm()
+                if distance < 35:
+                    print("Distance: " , distance)
+                    stopDriving()
+                    sleep(2)
+                    rotateDegreesRight(75)
+                    sleep(5)
+                    frontCollisionCounter = 1
+                    break 
         
         #detect tunnel
-        if frontCollisionCounter == 0:
-            moveDistForward(0.1)
-            sideUSensor(0.3)
-            print(distance)
-            sleep(0.2)
-            if distance < 30:
-                stopDriving()
-                tunnel = tunnelDetection()
-                if tunnel == 0:
-                    #hardcode the path into the left tunnel
-                    rotateDegreesLeft(75)
-                    sleep(4)
-                    moveDistForward(0.15)
-                    sleep(4)
-                    rotateDegreesRight(73)
-                    sleep(4)
-                    print('turning')
-                else:
-                    #hardcode the path into the right tunnel
-                    rotateDegreesRight(75)
-                    sleep(4)
-                    moveDistForward(0.15)
-                    sleep(4)
-                    rotateDegreesLeft(75)
-                    sleep(3)
-                frontCollisionCounter = 1
-                
-        #turn left after tunnel
         elif frontCollisionCounter == 1:
+            tunnel = tunnelDetection2()
+            if tunnel == 0:
+                #hardcode the path into the left tunnel
+                rotateDegreesLeft(75)
+                sleep(4)
+                moveDistForward(0.15)
+                sleep(4)
+                rotateDegreesRight(73)
+                sleep(4)
+                print('turning')
+            else:
+                #hardcode the path into the right tunnel
+                rotateDegreesRight(75)
+                sleep(4)
+                moveDistForward(0.15)
+                sleep(4)
+                rotateDegreesLeft(75)
+                sleep(3)
+            frontCollisionCounter = 2
+            
+        #turn left after tunnel
+        elif frontCollisionCounter == 2:
             if throughtunnel:
                 moveDistForward(1)
                 sleep(7)
                 throughtunnel = False
                 
             moveDistForward(0.1)
+            sideUSensorLeft(0.3)
             print("distance before turn", distance)
             sleep(0.2)
-            
-            if distance < 30:
+            colour = colourDetection()
+            if colour == 1:
+                moveDistForward(0.2)
                 stopDriving()
                 sleep(2)
-                rotateDegreesLeft(85)
-                frontCollisionCounter = 2
-                sleep(5)
-    
-        elif frontCollisionCounter == 2:
-            while True:
-                print(" The distance after turning is", distance)
-                moveDistForward(0.1)
-                sideUSensor(0.3)
-                sleep(0.2)
-                distance = FRONT_US.get_cm()
-                if distance < 15:
-                    print("Distance: " , distance)
-                    stopDriving()
-                    sleep(2)
-                    rotateDegreesLeft(165)
-                    sleep(5)
-                    frontCollisionCounter = 3
-                    break 
+                frontCollisionCounter = 3
+
         
 
         
@@ -454,16 +525,18 @@ def pathingPhase():
 def stopDriving():
     BP.set_motor_limits(MOTOR_LEFT, 70, 0)
     BP.set_motor_limits(MOTOR_RIGHT, 70, 0)
-
+    
 
 #Detects Red Colour
 def colourDetection():
-    while True:
-        #COLOR_SENSOR
-        red_lvl = COLOR_SENSOR.get_rgb()[0]
-        if red_lvl > 30:
-            print("red detected")
-            RED_DETECTION = True
+    colour = COLOR_SENSOR.get_rgb()
+    red_lvl, green_lvl, blue_lvl = colour[0], colour[1], colour[2]
+    
+    if (175 < red_lvl < 185) and (44 < green_lvl < 52) and (12 < blue_lvl < 20):
+        print("red detected")
+        return 1
+    else:
+        return 0
 
 
 
