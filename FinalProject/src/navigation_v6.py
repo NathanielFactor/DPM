@@ -24,6 +24,9 @@ MOTOR_INTAKE = BP.PORT_D
 # Setup before the robot begins
 print("Done initializing code")
 
+# Pathing global variables
+speed = 400
+
 # Hardware Constants
 RW = 0.0212
 RB = 0.1905
@@ -31,9 +34,6 @@ DISTTODEG = 180/(3.1416*RW)
 ORIENTTODEG = RB/RW
 SLEEP_CONSTANT = 8.72 # Seconds/meter -- Determined experimentally 
 SLEEP_CONSTANT_CHANGED = DISTTODEG / speed 
-
-# Pathing global variables
-speed = 400
 
 BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
 BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
@@ -126,25 +126,6 @@ def tunnelDetection():
     else:
         return 1
     
-
-def tunnelDetection2():
-    
-    rotateNavigationMotor(+135)
-    left_tunnel = SIDE_US.get_value()
-    print("Left Tunnel Dist: " + str(left_tunnel))
-    
-    sleep(1)
-    rotateNavigationMotor(-90)
-    right_tunnel = SIDE_US.get_value()
-    print("Right Tunnel Dist: " + str(right_tunnel))
-    
-    sleep(1)
-    rotateNavigationMotor(-35,0.65)
-
-    if left_tunnel > right_tunnel:
-        return 0
-    else:
-        return 1
 
 
 def sideUSensorRight(wall_dist=0.3, speed = 400, delta_speed = 150):
@@ -269,10 +250,6 @@ def pathingPhaseOne():
         print("Front Collision distance: " + str(distance))
 
         if frontCollisionCounter == 0: # BEFORE TUNNEL
-            moveDistForward(0.1)
-            sideUSensorRight(0.3, 350)
-            sleep(0.2)
-
             if distance < 30: # COLLISION/TUNNEL DETECTED 
                 stopDriving()
                 tunnel = tunnelDetection() # RETURNS 0 FOR LEFT, 1 FOR RIGHT
@@ -294,6 +271,9 @@ def pathingPhaseOne():
                     rotateDegreesLeft(75)
                     sleep(3)
                 frontCollisionCounter = 1
+            moveDistForward(0.1)
+            sideUSensorRight(0.3, 350)
+            sleep(0.2)
                 
         elif frontCollisionCounter == 1: # NAVIGATED TO TUNNEL
             if throughtunnel: # TRAVEL THROUGH TUNNEL FIRST
@@ -314,9 +294,6 @@ def pathingPhaseOne():
                 sleep(5)
     
         elif frontCollisionCounter == 2: # NAVIGATED PAST CORNER
-            moveDistForward(0.1)
-            sideUSensorRight(0.3)
-            sleep(0.2)
             if distance < 15: # FINAL WALL DETECTED
                 stopDriving()
                 sleep(2)
@@ -324,6 +301,9 @@ def pathingPhaseOne():
                 rotateDegreesLeft(165)
                 sleep(5)
                 frontCollisionCounter = 3
+            moveDistForward(0.1)
+            sideUSensorRight(0.3)
+            sleep(0.2)
 
     # PHYSICAL CUE TO START LOADING (PREPARE LOADING)           
     rotateNavigationMotor(-175)
@@ -355,25 +335,26 @@ def pathingPhaseTwo(tunnelVal):
     """
     while True: # TRAVEL STRAIGHT UNTIL OPEN TUNNEL
         distance = FRONT_US.get_cm()
+
+        if tunnelVal == 0 and distance < 40: # RIGHT TUNNEL, stop 50 (UNTESTED) before corner
+            break
+            
+        elif tunnelVal == 1 and distance < 15: # LEFT TUNNEL, stop 10 (UNTESTED) before corner
+            break
+        
+        print("Front US: " + str(distance))
         moveDistForward(0.1)
         sideUSensorLeft(0.3)
         sleep(0.2)
-
-        if tunnelVal == 0 and distance < 50: # RIGHT TUNNEL, stop 50 (UNTESTED) before corner
-            stopDriving()
-            sleep(2)
-        
-        elif tunnelVal == 1 and distance < 10: # LEFT TUNNEL, stop 10 (UNTESTED) before corner
-            stopDriving()
-            sleep(2)
-
-        # turn to face tunnel    
-        rotateDegreesRight(85)
-        sleep(5)
-        print("turning... ")
-        break
+    
             
     # exits loop and inits final pathing phase for red detection
+    stopDriving()
+    sleep(2)
+    rotateDegreesRight(85)
+    sleep(5)
+    
+    
     moveDistForward(1)
     sleep(7)
                 
@@ -445,12 +426,13 @@ def startThreading(action: FunctionType): # TRY THIS ALL-IN-ONE-FUNCTION
 if __name__ == "__main__":
     print("Robot initializing...")
     wait_ready_sensors(True)
-
+    #reset_brick()
+    
     tunnelCode = pathingPhaseOne()
     loadingPhase()
     pathingPhaseTwo(tunnelCode)
     startThreading(finalPathing)
     colourDetection()
-    #reset_brick()
+    
 
 
