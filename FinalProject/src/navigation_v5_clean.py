@@ -10,12 +10,8 @@ from types import FunctionType
 
 BP = brickpi3.BrickPi3() # Initialize the brickPi
 
-# Touch Sensor port connections 
-#LOADING_PHASE_BTN = TouchSensor(2)
-#EMERGENCY_STOP = TouchSensor(1)
-
 # Colour and US Sensor port connections
-COLOR_SENSOR = EV3ColorSensor(4) # port S2
+COLOR_SENSOR = EV3ColorSensor(4) # port S4
 FRONT_US = EV3UltrasonicSensor(1) # port S1
 SIDE_US = EV3UltrasonicSensor(3) # port S3
 
@@ -23,35 +19,21 @@ SIDE_US = EV3UltrasonicSensor(3) # port S3
 MOTOR_LEFT = BP.PORT_A
 MOTOR_RIGHT = BP.PORT_B
 MOTOR_NAVIGATION = BP.PORT_C
-#MOTOR_LAUNCH = BP.PORT_C
 MOTOR_INTAKE = BP.PORT_D
 
 # Setup before the robot begins
 print("Done initializing code")
-wait_ready_sensors()
 
-# Initialize global variables
-LOADING_PHASE = False
-ROTATE_NAVIGATION = False
-POWER_LIMIT = 70
-
-speed = 400
-
-# Pathing global variables
-frontCollisionCounter = 0  # Number of front collisions detected
-
-distanceToLoading = 10
-RED_DETECTION = False
+# Hardware Constants
 RW = 0.0212
 RB = 0.1905
 DISTTODEG = 180/(3.1416*RW)
 ORIENTTODEG = RB/RW
-tunnel_counter = 0
 SLEEP_CONSTANT = 8.72 # Seconds/meter -- Determined experimentally 
 SLEEP_CONSTANT_CHANGED = DISTTODEG / speed 
 
-# CHANGED: Moved outside of the moveDistForward to initializing area at the top 
-# so the adjustments for sideUS can update the values and use moveDistForward to move forward
+# Pathing global variables
+speed = 400
 
 BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
 BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
@@ -216,14 +198,14 @@ def sideUSensorRight(wall_dist=0.3, speed = 400, delta_speed = 150):
         print(error)
 
 
-def sideUSensorLeft(wallDistance=0.3, speed = 500, delta_speed = 150):
+def sideUSensorLeft(wallDistance=0.3, speed = 400, delta_speed = 150):
     """
     CALL UPDATES TO THE SIDE SENSOR DISTANCE WHEN FACING LEFT
     Parameters:
         wall_dist: desired distance from wall (default, 30cm)
-        speed: speed of wheel rotation (500 to be faster on way back)
+        speed: speed of wheel rotation (400 to be faster on way back)
             slow: 150
-            global: 400
+            fast: 500
         delta_speed: adjustments to speed to adjust for wall following (default = 150)
             should be approximately 30-40% of speed
     """
@@ -268,17 +250,20 @@ def sideUSensorLeft(wallDistance=0.3, speed = 500, delta_speed = 150):
         print(error)
 
 
-def pathingPhaseOne(frontCollisionCounter):
+def pathingPhaseOne():
     """
     PATHING FROM START TO LOADING ZONE
-    Parameter: frontCollisionCounter to track region along path
+    frontCollisionCounter to track region along path
         0: before tunnel
         1: through and after tunnel
         2: after corner
+    Returns: tunnel (0 for LEFT, 1 for RIGHT)
     Calls:
         sideUSensorRight(wall_dist=0.3, speed=400)
     """
+    frontCollisionCounter = 0
     throughtunnel = True
+    tunnel = 0
     while frontCollisionCounter < 3:
         distance = FRONT_US.get_cm()
         print("Front Collision distance: " + str(distance))
@@ -329,24 +314,20 @@ def pathingPhaseOne(frontCollisionCounter):
                 sleep(5)
     
         elif frontCollisionCounter == 2: # NAVIGATED PAST CORNER
-            while True:
-                # print(" The distance after turning is", distance)
-                moveDistForward(0.1)
-                sideUSensorRight(0.3)
-                sleep(0.2)
-                distance = FRONT_US.get_cm()
-                if distance < 15: # FINAL WALL DETECTED
-                    # print("Distance: " , distance)
-                    stopDriving()
-                    sleep(2)
-                    # TURN AROUND TO GO BACK
-                    rotateDegreesLeft(165)
-                    sleep(5)
-                    frontCollisionCounter = 3
-                    break
+            moveDistForward(0.1)
+            sideUSensorRight(0.3)
+            sleep(0.2)
+            if distance < 15: # FINAL WALL DETECTED
+                stopDriving()
+                sleep(2)
+                # TURN AROUND TO GO BACK
+                rotateDegreesLeft(165)
+                sleep(5)
+                frontCollisionCounter = 3
 
     # PHYSICAL CUE TO START LOADING (PREPARE LOADING)           
-    rotateNavigationMotor(-175)   
+    rotateNavigationMotor(-175)
+    return tunnel
 
 
 def loadingPhase(): 
@@ -365,64 +346,36 @@ def loadingPhase():
     sleep(1)
     
     
-def pathingPhaseTwo(frontCollisionCounter):
+def pathingPhaseTwo(tunnelVal):
     """
     PATHING FROM LOADING BACK TO START
-    Parameter: frontCollisionCounter to track region along path
-        0: before corner
-        1: tunnel detection
-        2: tunnel and to the end
+    Parameter: tunnelVal: 0 for RIGHT, 1 for LEFT (reversed from pathOne) 
     Calls:
         sideUSensorLeft(wall_dist=0.3, speed=500)
     """
-    throughtunnel = False
-    while frontCollisionCounter < 2:
+    while True: # TRAVEL STRAIGHT UNTIL OPEN TUNNEL
         distance = FRONT_US.get_cm()
+        moveDistForward(0.1)
+        sideUSensorLeft(0.3)
+        sleep(0.2)
+
+        if tunnelVal == 0 and distance < 50: # RIGHT TUNNEL, stop 50 (UNTESTED) before corner
+            stopDriving()
+            sleep(2)
         
-        if frontCollisionCounter == 0: # FROM LOADING TO CORNER
-            while True:
-                print(" The distance after turning is", distance)
-                moveDistForward(0.1)
-                sideUSensorLeft(0.3)
-                sleep(0.2)
-                distance = FRONT_US.get_cm()
-                if distance < 20: # COLLISION DETECTED (CORNER)
-                    print("Distance: " , distance)
-                    stopDriving()
-                    sleep(2)
-                    rotateDegreesRight(85)
-                    sleep(5)
-                    frontCollisionCounter = 1
-                    break 
-        
-        elif frontCollisionCounter == 1: # TUNNEL DETECTION
-            tunnel = tunnelDetection2() # RETURNS 1 FOR LEFT, 0 FOR RIGHT
-            if tunnel == 1:
-                # hardcode the path into the left tunnel
-                rotateDegreesLeft(75)
-                sleep(4)
-                moveDistForward(0.15)
-                sleep(4)
-                rotateDegreesRight(73)
-                sleep(4)
-                print('turning')
-                throughtunnel = True
-            else:
-                # hardcode the path into the right tunnel
-                rotateDegreesRight(75)
-                sleep(4)
-                moveDistForward(0.15)
-                sleep(4)
-                rotateDegreesLeft(75)
-                sleep(3)
-                throughtunnel = True
-            frontCollisionCounter = 2
+        elif tunnelVal == 1 and distance < 10: # LEFT TUNNEL, stop 10 (UNTESTED) before corner
+            stopDriving()
+            sleep(2)
+
+        # turn to face tunnel    
+        rotateDegreesRight(85)
+        sleep(5)
+        print("turning... ")
+        break
             
     # exits loop and inits final pathing phase for red detection
-    if throughtunnel:
-                moveDistForward(1)
-                sleep(7)
-                throughtunnel = False
+    moveDistForward(1)
+    sleep(7)
                 
             
 def finalPathing():
@@ -481,17 +434,22 @@ def run_in_background(action: FunctionType):
     thread1.start()
     return 
 
+def startThreading(action: FunctionType): # TRY THIS ALL-IN-ONE-FUNCTION
+    """
+    Run the functions specified in the argument in different threads.
+    """
+    thread1 = Thread(target=action)
+    thread1.start()
+    return
 
 if __name__ == "__main__":
-    sleep(2)
     print("Robot initializing...")
-    #reset_brick()
     wait_ready_sensors(True)
-    #moveDistForward(0.1)
-    pathingPhaseOne(frontCollisionCounter)
+
+    tunnelCode = pathingPhaseOne()
     loadingPhase()
-    pathingPhaseTwo(0)
-    begin_threading_instances()
+    pathingPhaseTwo(tunnelCode)
+    startThreading(finalPathing)
     colourDetection()
     #reset_brick()
 
