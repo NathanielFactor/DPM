@@ -151,8 +151,8 @@ def frontUSensor():
         distance = FRONT_US.get_cm()
         
         #update total distance travelled
-        distance_difference = distance - distanceToLoading
-        distanceToLoading += distance_difference#need to init global variable like this to update value
+        distance_difference = distanceToLoading - distance
+        distanceToLoading += distance_difference #need to init global variable like this to update value
         
         #tunnel detected
         if (distance < 20) and ((TUNNEL_COUNTER == 0) or (TUNNEL_COUNTER == 3)):
@@ -252,7 +252,7 @@ def colourDetection():
             print("red detected")
             RED_DETECTION = True
             
-
+'''
 #Kill Switch Implementation
 def monitor_kill_switch():
     """
@@ -299,11 +299,10 @@ def run_in_backgroud(action: FunctionType, action2: FunctionType):
     thread2= Thread(target=action2)
     thread2.start()
     return 
-
+'''
 def pathingPhaseOne():
     initPath()
-    sideUSensor()
-    
+    frontUSensor()
 
 
 
