@@ -68,6 +68,7 @@ def rotateDegreesRight(angle):
 def rotateDegreesLeft(angle):
     angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
+        #rotate motor with repect to RB and RW
         speed = 300
         BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
         BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
@@ -88,6 +89,7 @@ def initPath():
     
 
 def rotateNavigationMotor(degrees, sleepTime=0.5):
+    # the function to rotate the navigation motor
     BP.set_motor_limits(MOTOR_NAVIGATION, 150, degrees)
     degrees = degrees * 2
     
@@ -250,9 +252,12 @@ def pathingPhaseOne():
     Calls:
         sideUSensorRight(wall_dist=0.3, speed=400)
     """
+    # set the initial value
     frontCollisionCounter = 0
     throughtunnel = True
     tunnel = 0
+
+    # the robot will keep moving until it arrived to the loading zone
     while frontCollisionCounter < 3:
         distance = FRONT_US.get_cm()
         print("\n\n", distance, "\n\n")
@@ -382,7 +387,7 @@ def finalPathing():
     MOVE FORWARD SLOWLY FOR COLOUR SENSOR TO DETECT
     Calls: sideUSensorLeft(wall_dist=0.3, speed=500, delta_speed=150)
     """
-    #move fastre out of the tunnel to save time
+    #move faster out of the tunnel to save time
     for i in range(5):
         sideUSensorLeft(0.4)
         sleep(0.4) # int i increments every 0.4
