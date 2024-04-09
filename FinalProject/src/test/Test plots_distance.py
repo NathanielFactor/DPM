@@ -21,6 +21,9 @@ MOTOR_RIGHT = BP.PORT_B
 MOTOR_NAVIGATION = BP.PORT_C
 MOTOR_INTAKE = BP.PORT_D
 
+DELAY_SEC = 0.01  # seconds of delay between measurements
+US_SENSOR_DATA_FILE = "us_sensor_start_30cm.csv"
+
 # Setup before the robot begins
 print("Done initializing code")
 
@@ -107,20 +110,20 @@ def tunnelDetection():
     rotateNavigationMotor(dps, sleepTime=0.5)
     """
     #DONT CHANGE
-    rotateNavigationMotor(-115)
+    rotateNavigationMotor(-120)
     sleep(2)
     left_tunnel = SIDE_US.get_value()
     print("Left Tunnel Dist: " + str(left_tunnel))
     
     #DONT CHANGE
     sleep(2)
-    rotateNavigationMotor(70)
+    rotateNavigationMotor(90)
     right_tunnel = SIDE_US.get_value()
     print("Right Tunnel Dist: " + str(right_tunnel))
     
     #DONT CHANGE
     sleep(1)
-    rotateNavigationMotor(50)
+    rotateNavigationMotor(40)
     # rotates slightly more to return to proper position
 
     
@@ -157,6 +160,11 @@ def sideUSensorRight(wall_dist=0.3, speed = 400, delta_speed = 150):
 
         if dist >= us_outlier:
             dist = wall_dist
+        
+        output_file = open(US_SENSOR_DATA_FILE, "a")
+        if dist is not None: # If None is given, then data collection failed that time
+            output_file.write(f"{dist}\n")
+
 
         dist = dist/100.0
         error = wall_dist - dist
@@ -234,7 +242,9 @@ def sideUSensorLeft(wallDistance=0.3, speed = 400, delta_speed = 150):
             BP.set_motor_limits(MOTOR_LEFT, 100, speed + delta_speed)
             BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
             moveDistForward(0.1)
-
+            
+        output_file.close()
+    
     except IOError as error:
         print(error)
 
@@ -255,17 +265,16 @@ def pathingPhaseOne():
     tunnel = 0
     while frontCollisionCounter < 3:
         distance = FRONT_US.get_cm()
-        print("\n\n", distance, "\n\n")
-        sleep(0.02)
         print("Front Collision distance: " + str(distance))
 
         if frontCollisionCounter == 0: # BEFORE TUNNEL
             #moveDistForward(0.1)
             sideUSensorRight(0.3)
-            sleep(0.2) #I ADDED THIS 
+            sleep(0.2)
+            
             
             print(distance)
-            if (distance < 40): # COLLISION/TUNNEL DETECTED 
+            if (distance < 20): # COLLISION/TUNNEL DETECTED 
                 stopDriving()
                 tunnel = tunnelDetection() # RETURNS 0 FOR LEFT tunnel, 1 FOR RIGHT tunnel
                 if tunnel == 0:
@@ -279,10 +288,10 @@ def pathingPhaseOne():
                     print('turning')
                 else:
                     #hardcode the path into the right tunnel
-                    rotateDegreesRight(70)
+                    rotateDegreesRight(60)
                     sleep(2)
-                    moveDistForward(0.17)
-                    sleep(2.5)
+                    moveDistForward(0.18)
+                    sleep(2.2)
                     rotateDegreesLeft(55)
                     sleep(2)
                 frontCollisionCounter = 1
@@ -459,4 +468,5 @@ if __name__ == "__main__":
     pathingPhaseTwo(tunnelCode)
     startThreading(finalPathing)
     colourDetection()    
+
 
