@@ -51,7 +51,7 @@ def moveDistForward(dist): # moves wheels forward at the PRESET speed by set_mot
         print(error)
         
 
-def rotateDegreesRight(angle):
+def rotateDegreesRight(angle): # rotate the robot to right in certain degrees 
     angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
         #rotate motor with repect to RB and RW
@@ -65,7 +65,7 @@ def rotateDegreesRight(angle):
         print(error)
 
 
-def rotateDegreesLeft(angle):
+def rotateDegreesLeft(angle): # rotate the robot to left in certain degrees
     angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
         #rotate motor with repect to RB and RW
