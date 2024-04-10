@@ -51,7 +51,7 @@ def moveDistForward(dist): # moves wheels forward at the PRESET speed by set_mot
         print(error)
         
 
-def rotateDegreesRight(angle): # rotate the robot to right in certain degrees 
+def rotateDegreesRight(angle):
     angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
         #rotate motor with repect to RB and RW
@@ -65,10 +65,9 @@ def rotateDegreesRight(angle): # rotate the robot to right in certain degrees
         print(error)
 
 
-def rotateDegreesLeft(angle): # rotate the robot to left in certain degrees
+def rotateDegreesLeft(angle):
     angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
-        #rotate motor with repect to RB and RW
         speed = 300
         BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
         BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
@@ -89,7 +88,6 @@ def initPath():
     
 
 def rotateNavigationMotor(degrees, sleepTime=0.5):
-    # the function to rotate the navigation motor
     BP.set_motor_limits(MOTOR_NAVIGATION, 150, degrees)
     degrees = degrees * 2
     
@@ -109,23 +107,24 @@ def tunnelDetection():
     rotateNavigationMotor(dps, sleepTime=0.5)
     """
     #DONT CHANGE
-    rotateNavigationMotor(-115)
+    rotateNavigationMotor(-105)
     sleep(2)
     left_tunnel = SIDE_US.get_value()
+    sleep(1)
     print("Left Tunnel Dist: " + str(left_tunnel))
     
     #DONT CHANGE
     sleep(2)
-    rotateNavigationMotor(70)
+    rotateNavigationMotor(45)
     right_tunnel = SIDE_US.get_value()
+    sleep(1)
     print("Right Tunnel Dist: " + str(right_tunnel))
     
     #DONT CHANGE
     sleep(1)
-    rotateNavigationMotor(50)
+    rotateNavigationMotor(60)
     # rotates slightly more to return to proper position
 
-    
     if left_tunnel > right_tunnel:
         return 0
     else:
@@ -252,26 +251,30 @@ def pathingPhaseOne():
     Calls:
         sideUSensorRight(wall_dist=0.3, speed=400)
     """
-    # set the initial value
     frontCollisionCounter = 0
     throughtunnel = True
     tunnel = 0
-
-    # the robot will keep moving until it arrived to the loading zone
     while frontCollisionCounter < 3:
         distance = FRONT_US.get_cm()
-        print("\n\n", distance, "\n\n")
-        sleep(0.02)
         print("Front Collision distance: " + str(distance))
 
         if frontCollisionCounter == 0: # BEFORE TUNNEL
             #moveDistForward(0.1)
             sideUSensorRight(0.3)
-            sleep(0.2) #I ADDED THIS 
+            sleep(0.2)
+
             
             print(distance)
-            if (distance < 40): # COLLISION/TUNNEL DETECTED 
-                stopDriving()
+            if (distance < 20): # COLLISION/TUNNEL DETECTED 
+                # stopDriving()
+                # sleep(0.5)
+                ####
+                BP.set_motor_limits(MOTOR_RIGHT, 100, 400)
+                BP.set_motor_limits(MOTOR_LEFT, 100, 400)
+                moveDistForward(-0.08)
+                sleep(2)
+                ####
+
                 tunnel = tunnelDetection() # RETURNS 0 FOR LEFT tunnel, 1 FOR RIGHT tunnel
                 if tunnel == 0:
                     # hardcode the path into the left tunnel
@@ -284,10 +287,10 @@ def pathingPhaseOne():
                     print('turning')
                 else:
                     #hardcode the path into the right tunnel
-                    rotateDegreesRight(70)
+                    rotateDegreesRight(60)
                     sleep(2)
-                    moveDistForward(0.17)
-                    sleep(2.5)
+                    moveDistForward(0.18)
+                    sleep(2.2)
                     rotateDegreesLeft(55)
                     sleep(2)
                 frontCollisionCounter = 1
@@ -387,7 +390,7 @@ def finalPathing():
     MOVE FORWARD SLOWLY FOR COLOUR SENSOR TO DETECT
     Calls: sideUSensorLeft(wall_dist=0.3, speed=500, delta_speed=150)
     """
-    #move faster out of the tunnel to save time
+    #move fastre out of the tunnel to save time
     for i in range(5):
         sideUSensorLeft(0.4)
         sleep(0.4) # int i increments every 0.4
@@ -463,8 +466,5 @@ if __name__ == "__main__":
     loadingPhase()
     pathingPhaseTwo(tunnelCode)
     startThreading(finalPathing)
-    colourDetection() 
-    while True:
-        distance = FRONT_US.get_cm()
-           
+    colourDetection()    
 
