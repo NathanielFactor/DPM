@@ -10,75 +10,65 @@ from types import FunctionType
 
 BP = brickpi3.BrickPi3() # Initialize the brickPi
 
-# Touch Sensor port connections 
-#LOADING_PHASE_BTN = TouchSensor(1)
-#EMERGENCY_STOP = TouchSensor(1)
-
 # Colour and US Sensor port connections
-COLOR_SENSOR = EV3ColorSensor(2) # port S2
-FRONT_US = EV3UltrasonicSensor(1) # port S4
-SIDE_US = EV3UltrasonicSensor(4) # port S3
+COLOR_SENSOR = EV3ColorSensor(2) # port S4
+FRONT_US = EV3UltrasonicSensor(1) # port S1
+SIDE_US = EV3UltrasonicSensor(3) # port S3
 
 # Motor Connections and initialization
 MOTOR_LEFT = BP.PORT_A
 MOTOR_RIGHT = BP.PORT_B
 MOTOR_NAVIGATION = BP.PORT_C
-#MOTOR_LAUNCH = BP.PORT_C
 MOTOR_INTAKE = BP.PORT_D
-
-# Initialize global variables
-LOADING_PHASE = False
-ROTATE_NAVIGATION = False
-POWER_LIMIT = 100
-
-# Pathing global variables
-FRONT_COLLISSION = False
-distanceToLoading = 0
-tunnelCounter = 0
-RED_DETECTION = False
-RW = 0.025
-RB = 0.1905
-DISTTODEG = 180/(3.1416*RW)
-ORIENTTODEG = RB/RW
 
 # Setup before the robot begins
 print("Done initializing code")
-wait_ready_sensors()
 
-def play_sound(NOTE):
-    
-    """Play a single note."""
-    NOTE.play()
-    NOTE.wait_done()
+# Pathing global variables
+speed = 400
 
-def moveDistForward(dist):
+# Hardware Constants
+RW = 0.0212 #e Estimate wheel radius
+RB = 0.1905 # Estimate wheel base
+DISTTODEG = 180/(3.1416*RW)
+ORIENTTODEG = RB/RW
+SLEEP_CONSTANT = 8.72 # Seconds/meter -- Determined experimentally 
+SLEEP_CONSTANT_CHANGED = DISTTODEG / speed 
+
+BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
+BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
+
+
+def moveDistForward(dist): # moves wheels forward at the PRESET speed by set_motor_limits
     try:
-        print("moving forward!")
-        speed = 150
-        BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
-        BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
+        # set position relative to the wheel radius and radians conversion
         BP.set_motor_position_relative(MOTOR_LEFT, int(dist*DISTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(dist*DISTTODEG))
-        print("Finished moving: " + str(dist))
+        return dist
+        
+    #error handling if error
     except IOError as error:
         print(error)
-
+        
 
 def rotateDegreesRight(angle):
+    angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
-        print("rotating right")
-        speed = 150
+        #rotate motor with repect to RB and RW
+        speed = 300
         BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
         BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(angle*ORIENTTODEG))
         BP.set_motor_position_relative(MOTOR_RIGHT, int(-angle*ORIENTTODEG))
+
     except IOError as error:
         print(error)
-        
+
+
 def rotateDegreesLeft(angle):
+    angle = angle/2 # Divide by 2 since each motor will move at half of the angle desired
     try:
-        print("rotating left")
-        speed = 150
+        speed = 300
         BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
         BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
         BP.set_motor_position_relative(MOTOR_LEFT, int(-angle*ORIENTTODEG))
@@ -86,49 +76,85 @@ def rotateDegreesLeft(angle):
     except IOError as error:
         print(error)
 
-def collisionFront():
-    frontUSensor()
 
 def initPath():
     #align the robot with the red tunnel close to the wall
-    print("starting path")
-    moveDistForward(1)
-    
-    #rotateDegreesRight(45)
-    #sleep(3)
-    #moveDistForward(.15)
-    #sleep(3)
-    #rotateDegreesLeft(45)
+    rotateDegreesRight(75)
+    sleep(3)
+    moveDistForward(.15)
+    sleep(3)
+    rotateDegreesLeft(75)
     print("finish test")
-
     
-def otherTunnel():
-    #rotate the robot a certain amount of cm to the left and select the other tunnel then resume drive
-    rotateDegreesLeft(45)
-    sleep(3)
-    moveDistForward(.2)
-    sleep(3)
-    rotateDegreesRight(45)
 
-
-def sideUSensor():
-    print("entering function")
+def rotateNavigationMotor(degrees, sleepTime=0.5):
+    BP.set_motor_limits(MOTOR_NAVIGATION, 150, degrees)
+    degrees = degrees * 2
     
-    sample_int = 0.2 #sample every 200 ms
-    wall_dist = 0.2 #20 cm from wall
-    deadband = 0.05 #5 cm tolerance from wall_dist
-    speed = 150 #default speed
-    delta_speed = 100 #default change in speed
+    print("rotating")
+    BP.set_motor_dps(MOTOR_NAVIGATION, degrees)
+    sleep(sleepTime)
+    
+    print("finished rotating")
+    BP.set_motor_dps(MOTOR_NAVIGATION, 0)
+
+
+def tunnelDetection():
+    """
+    ROTATES NAVIGATION MOTOR AND COMPARES DISTANCE ON BOTH SIDES
+    Returns:    0 for left tunnel
+                1 for right tunnel
+    rotateNavigationMotor(dps, sleepTime=0.5)
+    """
+    #DONT CHANGE
+    rotateNavigationMotor(-105)
+    sleep(2)
+    left_tunnel = SIDE_US.get_value()
+    sleep(1)
+    print("Left Tunnel Dist: " + str(left_tunnel))
+    
+    #DONT CHANGE
+    sleep(2)
+    rotateNavigationMotor(45)
+    right_tunnel = SIDE_US.get_value()
+    sleep(1)
+    print("Right Tunnel Dist: " + str(right_tunnel))
+    
+    #DONT CHANGE
+    sleep(1)
+    rotateNavigationMotor(60)
+    # rotates slightly more to return to proper position
+
+    if left_tunnel > right_tunnel:
+        return 0
+    else:
+        return 1
+    
+def is_sane(dist_prev, dist_cur):
+    error = 0.1
+    if (dist_prev - dist_cur > 0.1):
+        return 0
+    else:
+        return 1
+    
+
+def sideUSensorRight(wall_dist=0.3, speed = 400, delta_speed = 150):
+    """
+    CALL UPDATES TO THE SIDE SENSOR DISTANCE WHEN FACING RIGHT 
+    Parameters:
+        wall_dist: desired distance from wall (default, 30cm)
+        speed: speed of wheel rotation (default, global speed = 400)
+            slow: 150
+            fast: 500
+        delta_speed: adjustments to speed to adjust for wall following (default = 150)
+            should be approximately 30-40% of speed
+    """
+    deadband = 0.01 #1 cm tolerance from wall_dist
     us_outlier = 200 #anything outside of 200 cm is ignored
 
-    BP.set_motor_limits(MOTOR_LEFT, 100, speed)
-    BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
-    moveDistForward(0.1)
-
-    while True:
-        print("entering while loop")
-        dist = SIDE_US.get_raw_value()
-        print(".")
+    try:
+        print("\nRefreshing side US")
+        dist = SIDE_US.get_cm()
 
         if dist >= us_outlier:
             dist = wall_dist
@@ -142,240 +168,303 @@ def sideUSensor():
         if abs(error) <= deadband:
             BP.set_motor_limits(MOTOR_LEFT, 100, speed)
             BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+            moveDistForward(0.1)
 
         #case2: negative error, move closer to wall
         elif error < 0:
-            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
-            BP.set_motor_limits(MOTOR_RIGHT, 100, speed + delta_speed)
+            print("Adjust closer")
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed + delta_speed)
+            moveDistForward(0.1)
 
         #case3: positive error, move further from wall
         else:
+            print("Adjust further")
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed + delta_speed)
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            moveDistForward(0.1)
+
+    except IOError as error:
+        print(error)
+
+
+def sideUSensorLeft(wallDistance=0.3, speed = 400, delta_speed = 150):
+    """
+    CALL UPDATES TO THE SIDE SENSOR DISTANCE WHEN FACING LEFT
+    Parameters:
+        wall_dist: desired distance from wall (default, 30cm)
+        speed: speed of wheel rotation (400 to be faster on way back)
+            slow: 150
+            fast: 500
+        delta_speed: adjustments to speed to adjust for wall following (default = 150)
+            should be approximately 30-40% of speed
+    """
+    wall_dist = wallDistance
+    deadband = 0.01 #2 cm tolerance from wall_dist
+    us_outlier = 200 #anything outside of 200 cm is ignored
+
+    try:
+        print("\nRefreshing side US")
+        sleep(0.2)
+        dist = SIDE_US.get_cm()
+
+        if dist >= us_outlier:
+            dist = wall_dist
+
+        dist = dist/100.0
+        error = wall_dist - dist
+        print('dist: {:0.2f}'.format(dist))
+        print('error: {:0.2f}'.format(error))
+
+        #case1: error is within deadband tolerance: no change
+        if abs(error) <= deadband:
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            moveDistForward(0.1)
+
+        #case2: negative error, move closer to wall
+        elif error < 0:
+            print("Adjust closer")
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed + delta_speed)
+            moveDistForward(0.1)
+
+        #case3: positive error, move further from wall
+        else:
+            print("Adjust further")
             BP.set_motor_limits(MOTOR_LEFT, 100, speed + delta_speed)
             BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+            moveDistForward(0.1)
 
-        sleep(sample_int)
+    except IOError as error:
+        print(error)
 
 
-
-def frontUSensor():
-    print("entering frontUSensor")
-    sleep(1)
-    FRONT_COLLISSION = False
-    TUNNEL_COUNTER = 0
-    
-    while not FRONT_COLLISSION:
+def pathingPhaseOne():
+    """
+    PATHING FROM START TO LOADING ZONE
+    frontCollisionCounter to track region along path
+        0: before tunnel
+        1: through and after tunnel
+        2: after corner
+    Returns: tunnel (0 for LEFT, 1 for RIGHT)
+    Calls:
+        sideUSensorRight(wall_dist=0.3, speed=400)
+    """
+    frontCollisionCounter = 0
+    throughtunnel = True
+    tunnel = 0
+    while frontCollisionCounter < 3:
         distance = FRONT_US.get_cm()
-        moveDistForward(1)
-        print(str(distance))
-        
-        ##update total distance travelled
-        #distance_difference = distance - distanceToLoading
-        #distanceToLoading += distance_difference#need to init global variable like this to update value
-        
-        #tunnel detected
-        if (distance < 20) and ((TUNNEL_COUNTER == 0) or (TUNNEL_COUNTER == 3)):
-            FRONT_COLLISSION = True
-            TUNNEL_COUNTER = 1
-            otherTunnel()
-            
-        # First encounter with wall turn left
-        elif (distance < 20) and (TUNNEL_COUNTER == 1):
-            FRONT_COLLISSION = True #stop driving thread
-            #rotate the robot 90 degrees with the wheels
-            rotateDegreesLeft(45)
-            
-            # Time taken to rotate 90 degrees (adjust this based on experimentation)
-            rotation_time = 3  # seconds
-            # Wait for the rotation to complete
-            sleep(rotation_time)
-            # Stop motors
-            stopDriving()
-            TUNNEL_COUNTER = 2
-        
-        # Second encounter with wall, turn right
-        elif (distance < 20) and (TUNNEL_COUNTER == 2):
-            FRONT_COLLISSION = True #stop driving thread
-            #rotate the robot 90 degrees with the wheels
-            speed = 150
-            BP.set_motor_limits(MOTOR_LEFT, 100, speed)  # Adjust as needed
-            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)  # Adjust as needed
+        print("Front Collision distance: " + str(distance))
 
-            #rotate 90 degrees
-            rotateDegreesLeft(45)
-            
-            # Time taken to rotate 90 degrees (adjust this based on experimentation)
-            rotation_time = 3  # seconds
-            # Wait for the rotation to complete
-            sleep(rotation_time)
-            # Stop motors
-            stopDriving()
-            TUNNEL_COUNTER = 3
-            
-            
-#Enter Loading Phase Initiation           
-def loadingPhase():
-    """
-    This is to be run in its own thread. Enter the loading phase if the global variable of 420 cm is met.
-    Once met, it will stop on the tile and enter the loading phase until a button is pressed to leave the
-    loading phase and continue pathing back to the launching phase.
-    """
+        if frontCollisionCounter == 0: # BEFORE TUNNEL
+            #moveDistForward(0.1)
+            sideUSensorRight(0.3)
+            sleep(0.2)
 
-    LOADING_PHASE = False
+            
+            print(distance)
+            if (distance < 20): # COLLISION/TUNNEL DETECTED 
+                # stopDriving()
+                # sleep(0.5)
+                ####
+                BP.set_motor_limits(MOTOR_RIGHT, 100, 400)
+                BP.set_motor_limits(MOTOR_LEFT, 100, 400)
+                moveDistForward(-0.08)
+                sleep(2)
+                ####
+
+                tunnel = tunnelDetection() # RETURNS 0 FOR LEFT tunnel, 1 FOR RIGHT tunnel
+                if tunnel == 0:
+                    # hardcode the path into the left tunnel
+                    rotateDegreesLeft(60)
+                    sleep(2)
+                    moveDistForward(0.14)
+                    sleep(2)
+                    rotateDegreesRight(60)
+                    sleep(2)
+                    print('turning')
+                else:
+                    #hardcode the path into the right tunnel
+                    rotateDegreesRight(60)
+                    sleep(2)
+                    moveDistForward(0.18)
+                    sleep(2.2)
+                    rotateDegreesLeft(55)
+                    sleep(2)
+                frontCollisionCounter = 1
+
+        elif frontCollisionCounter == 1: # NAVIGATED TO TUNNEL
+            if throughtunnel: # TRAVEL THROUGH TUNNEL FIRST
+                moveDistForward(1)
+                sleep(9)
+                throughtunnel = False
+
+            # MOVE FORWARD UNTIL CORNER    
+            moveDistForward(0.1)
+            sideUSensorRight(0.4)
+            sleep(0.3)
+            
+            if (distance < 30): # COLLISION / CORNER WALL DETECTED
+                stopDriving()
+                sleep(2)
+                rotateDegreesLeft(85)
+                frontCollisionCounter = 2
+                sleep(5)
+    
+        elif frontCollisionCounter == 2: # NAVIGATED PAST CORNER
+            #moveDistForward(0.1)
+            sideUSensorRight(0.3)
+            sleep(0.3)
+            distance = FRONT_US.get_cm()
+            if (distance < 15): # FINAL WALL DETECTED
+                stopDriving()
+                sleep(2)
+                # TURN AROUND TO GO BACK
+                rotateDegreesLeft(165)
+                sleep(5)
+                frontCollisionCounter = 3
+
+    # PHYSICAL CUE TO START LOADING (PREPARE LOADING)           
+    rotateNavigationMotor(-160)
+    return tunnel
+
+
+def loadingPhase(): 
+    """ 
+    HOLD IN LOADING UNTIL PHYSICAL CUE IS DETECTED
+    """
+    loadingPhase = False
+    while not loadingPhase: # WAIT FOR PHYSICAL CUE
+        if FRONT_US.get_cm() < 5: #wave hand close to less than 5 cm infront of the Front US
+            loadingPhase = True
+        sleep(0.3)
+
+    # PHYSICAL CUE TO INDICATE LOADING IS COMPLETED
+    rotateNavigationMotor(170)
+    rotateNavigationMotor(-170)
+    sleep(1)
+    
+ 
+def pathingPhaseTwo(tunnelVal):
+    """
+    PATHING FROM LOADING BACK TO START
+    Parameter: tunnelVal: 0 for RIGHT, 1 for LEFT (reversed from pathOne) 
+    Calls:
+        sideUSensorLeft(wall_dist=0.3, speed=500)
+    """
+    
     
     while True:
-        #note this detection for distance will be in the drive() function not in here!
-        if distanceToLoading == 420:
-            LOADING_PHASE = True 
+        distance = FRONT_US.get_cm()
+        print(distance)
+        #travel until collission with wall FRONT US
+        if (distance < 15):
             
-        while LOADING_PHASE: # If button pressed, motor will continuously drum
-            print("entering loading phase...")
-            play_sound("A")
-            # kill all other threads
-            
-            if LOADING_PHASE_BTN.is_pressed():
-                print("leaving loading phase")
-                # rotate the navingation system
-                BP.set_motor_limits(MOTOR_NAVIGATION,POWER_LIMIT,500)
-                BP.set_motor_position_relative(MOTOR_NAVIGATION, 180)
-                LOADING_PHASE = False
-
-
-#Stops Driving Motors
-def stopDriving():
-    BP.set_motor_limits(MOTOR_LEFT, 0)
-    BP.set_motor_limits(MOTOR_RIGHT, 0)
-
-
-#Launch Mechanism
-def launch():
+            sleep(1)
+            #if originally was the far tunnel then travel backwards 30cm
+            if tunnelVal == 0:
+                BP.set_motor_limits(MOTOR_RIGHT, 100, 400)
+                BP.set_motor_limits(MOTOR_LEFT, 100, 400)
+                moveDistForward(-0.325)
+                sleep(1)
+            break
+        
+        #if no collission use side sensor to travel forward 30cm away from side wall
+        sideUSensorLeft(0.3)
+        sleep(0.2)
+              
+    # exits loop and inits final pathing phase for red detection
     sleep(2)
-    RED_DETECTION = True
-    BP.set_motor_limits(MOTOR_LAUNCH, 100, 700)
-    print("forwards")
-    BP.set_motor_position_relative(MOTOR_LAUNCH, 90)
-    sleep(2)
-    print("backwards")
-    BP.set_motor_position_relative(MOTOR_LAUNCH, -90)
-    sleep(2)
-    print("launched ball")
-
-
-#Detects Red Colour
-def colourDetection():
-    while True:
-        #COLOR_SENSOR
-        red_lvl = COLOR_SENSOR.get_rgb()[0]
-        if red_lvl > 30:
-            print("red detected")
-            RED_DETECTION = True
-            
-def intakeSystem():
-    
-    for i in range(5):
-        print("intaking ball")
-        BP.set_motor_dps(MOTOR_INTAKE, 220)
-        sleep(0.3)
-        
-        BP.set_motor_dps(MOTOR_INTAKE, -220)
-        sleep(0.6)
-        
-        BP.set_motor_dps(MOTOR_INTAKE, 220)
-        sleep(0.3)
-        
-        print("launching")
-        BP.set_motor_dps(MOTOR_INTAKE, 0)
-        launch()
-        sleep(2)
-        
-    print("intaking ball")
-    BP.set_motor_dps(MOTOR_INTAKE, 240)
-    sleep(0.4)
-    
-    BP.set_motor_dps(MOTOR_INTAKE, -245)
-    sleep(0.6)
-    
-    BP.set_motor_dps(MOTOR_INTAKE, 240)
-    sleep(0.21)
-    
-    print("launching")
-    BP.set_motor_dps(MOTOR_INTAKE, 0)
-    launch()
+    rotateDegreesRight(80)
     sleep(2)
     
-    reset_brick()
-    
-'''
-#Kill Switch Implementation
-def monitor_kill_switch():
-    """
-    Verify the status of the kill switch touch sensor. If the kill switch is activated, terminate the whole program.
-    This function will be continuously ran, and is only terminated if the kill switch is pressed.
-    """
-    try:
-        while True:
-            sleep(0.01)
-            if EMERGENCY_STOP.is_pressed():
-                print("KILL SWItCH HIt")    
-                exit()
+    #no sensor usage through the tunnel
+    moveDistForward(1)
+    sleep(9)
                 
-    except Exception as e:  # Calpute all exceptions and record it
-        print(e) #if an exception occurs, print it
-        pass
+            
+def finalPathing():
+    """
+    MOVE FORWARD SLOWLY FOR COLOUR SENSOR TO DETECT
+    Calls: sideUSensorLeft(wall_dist=0.3, speed=500, delta_speed=150)
+    """
+    #move fastre out of the tunnel to save time
+    for i in range(5):
+        sideUSensorLeft(0.4)
+        sleep(0.4) # int i increments every 0.4
     
-    finally: # When touch sensor 2 is touched, initiate closing sequence
-        reset_brick() # Turn off everything on the brick's hardware, and reset it
-        exit()
+    while True:     
+        moveDistForward(0.05)
+        sideUSensorLeft(0.4, 150, 50) # working for 0.4, 150, 50
+        sleep(0.05) # working for 0.05
 
+    
+def stopDriving(): # STOPS MOTORS FROM DRIVING
+    #set driving speed limit to 0 to stop motor
+    BP.set_motor_limits(MOTOR_LEFT, 70, 0)
+    BP.set_motor_limits(MOTOR_RIGHT, 70, 0)
+    
+
+def colourDetection(): # RED COLOUR DETECTION
+    """
+    CONTINUOUS SAMPLING FOR RED COLOUR
+    resets brick when detected
+    """
+    while True:
+        #get the colour sensor rgb
+        colour = COLOR_SENSOR.get_rgb()
+        red_lvl, green_lvl, blue_lvl = colour[0], colour[1], colour[2]
+        print(colour)
+        
+        #if <R,G,B> values fit estimated red colour vector then exit infinite loop
+        if (50 < red_lvl < 300) and (0 < green_lvl < 70) and (0 < blue_lvl < 60):
+            print("red detected")
+            break
+        
+        sleep(0.2) # working for sampling rate of 0.2
+        
+    print("stop driving")
+    sleep(2.2) # working for 2.2 sec sleep
+    # CONTINUE DRIVING ENOUGH TO MATCH LAUNCHING ZONE
+    reset_brick()
+    exit()
 
 def begin_threading_instances():
     """
     Begin different threading instances for the different parts of the code that should be running and retrieving 
     data at the same time. 
     """
-
-    #fix this last
-    run_in_backgroud(lambda: sideUSensor(), lambda: initPath()) # Both functions that we want running at the same time
+    run_in_background(lambda: finalPathing()) # Both functions that we want running at the same time
 
 
-def run_in_backgroud(action: FunctionType, action2: FunctionType):
-
+def run_in_background(action: FunctionType):
     """
     Run the functions specified in the argument in different threads.
     """
-
+    
     # Start the thread for sideUS based on motor encoder 
     thread1 = Thread(target=action)
     thread1.start()
-
-    # Start the thread for Pathing on touch sensor actication
-    thread2 = Thread(target=action2)
-    thread2.start()
     return 
-'''
-def navigationMotor():
-    BP.set_motor_limits(MOTOR_NAVIGATION, 100, 360)
-    
-    print("rotating")
-    BP.set_motor_dps(MOTOR_NAVIGATION, 360)
-    sleep(2)
-    
-    print("turning off")
-    BP.set_motor_dps(MOTOR_NAVIGATION, 0)
-    sleep(2)
-    reset_brick()
-    
+
+def startThreading(action: FunctionType):
+    """
+    Run the functions specified in the argument in different threads.
+    """
+    thread1 = Thread(target=action)
+    thread1.start()
+    return
 
 if __name__ == "__main__":
-    reset_brick()
-    print("starting")
-    sleep(2)
     print("Robot initializing...")
-    #collisionFront()
-    #launch()
-    #begin_threading_instances()
-    #intakeSystem()
-    sideUSensor()
-    #navigationMotor()
+    wait_ready_sensors(True)
+    #reset_brick() #used for reseting all encoders during testing
     
-    #monitor_kill_switch()
-              
+    tunnelCode = pathingPhaseOne()
+    loadingPhase()
+    pathingPhaseTwo(tunnelCode)
+    startThreading(finalPathing)
+    colourDetection()    
+

@@ -16,8 +16,8 @@ BP = brickpi3.BrickPi3() # Initialize the brickPi
 
 # Colour and US Sensor port connections
 COLOR_SENSOR = EV3ColorSensor(2) # port S2
-FRONT_US = EV3UltrasonicSensor(1) # port S1
-SIDE_US = EV3UltrasonicSensor(4) # port S4
+FRONT_US = EV3UltrasonicSensor(1) # port S4
+SIDE_US = EV3UltrasonicSensor(4) # port S3
 
 # Motor Connections and initialization
 MOTOR_LEFT = BP.PORT_A
@@ -25,10 +25,6 @@ MOTOR_RIGHT = BP.PORT_B
 MOTOR_NAVIGATION = BP.PORT_C
 #MOTOR_LAUNCH = BP.PORT_C
 MOTOR_INTAKE = BP.PORT_D
-
-# Setup before the robot begins
-print("Done initializing code")
-wait_ready_sensors()
 
 # Initialize global variables
 LOADING_PHASE = False
@@ -45,7 +41,9 @@ RB = 0.1905
 DISTTODEG = 180/(3.1416*RW)
 ORIENTTODEG = RB/RW
 
-
+# Setup before the robot begins
+print("Done initializing code")
+wait_ready_sensors()
 
 def play_sound(NOTE):
     
@@ -126,39 +124,36 @@ def sideUSensor():
     BP.set_motor_limits(MOTOR_LEFT, 100, speed)
     BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
     moveDistForward(0.1)
-    try:
-        while True:
-            print("entering while loop")
-            dist = SIDE_US.get_value()
-            print(".")
 
-            if dist >= us_outlier:
-                dist = wall_dist
+    while True:
+        print("entering while loop")
+        dist = SIDE_US.get_raw_value()
+        print(".")
 
-            dist = dist/100.0
-            error = wall_dist - dist
-            print('dist: {:0.2f}'.format(dist))
-            print('error: {:0.2f}'.format(error))
+        if dist >= us_outlier:
+            dist = wall_dist
 
-            #case1: error is within deadband tolerance: no change
-            if abs(error) <= deadband:
-                BP.set_motor_limits(MOTOR_LEFT, 100, speed)
-                BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+        dist = dist/100.0
+        error = wall_dist - dist
+        print('dist: {:0.2f}'.format(dist))
+        print('error: {:0.2f}'.format(error))
 
-            #case2: negative error, move closer to wall
-            elif error < 0:
-                BP.set_motor_limits(MOTOR_LEFT, 100, speed)
-                BP.set_motor_limits(MOTOR_RIGHT, 100, speed + delta_speed)
+        #case1: error is within deadband tolerance: no change
+        if abs(error) <= deadband:
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
 
-            #case3: positive error, move further from wall
-            else:
-                BP.set_motor_limits(MOTOR_LEFT, 100, speed + delta_speed)
-                BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+        #case2: negative error, move closer to wall
+        elif error < 0:
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed + delta_speed)
 
-            sleep(sample_int)
-    
-    except IOError as error:
-        print(error)
+        #case3: positive error, move further from wall
+        else:
+            BP.set_motor_limits(MOTOR_LEFT, 100, speed + delta_speed)
+            BP.set_motor_limits(MOTOR_RIGHT, 100, speed)
+
+        sleep(sample_int)
 
 
 
@@ -252,7 +247,7 @@ def stopDriving():
 
 
 #Launch Mechanism
-"""def launch():
+def launch():
     sleep(2)
     RED_DETECTION = True
     BP.set_motor_limits(MOTOR_LAUNCH, 100, 700)
@@ -264,7 +259,7 @@ def stopDriving():
     sleep(2)
     print("launched ball")
 
-"""
+
 #Detects Red Colour
 def colourDetection():
     while True:
@@ -289,7 +284,7 @@ def intakeSystem():
         
         print("launching")
         BP.set_motor_dps(MOTOR_INTAKE, 0)
-        #launch()
+        launch()
         sleep(2)
         
     print("intaking ball")
@@ -300,11 +295,11 @@ def intakeSystem():
     sleep(0.6)
     
     BP.set_motor_dps(MOTOR_INTAKE, 240)
-    sleep(0.4)
+    sleep(0.21)
     
     print("launching")
     BP.set_motor_dps(MOTOR_INTAKE, 0)
-    #launch()
+    launch()
     sleep(2)
     
     reset_brick()
